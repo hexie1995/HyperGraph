@@ -66,10 +66,9 @@ class GrowingHypergraph:
     
     def degree_sequence(self):
         degree_seq = Counter({node : 0 for node in self.N})
-        for node in self.N:
-            for edge in self.E: 
-                if node in edge: 
-                    degree_seq[node] += 1
+        for edge in self.E: 
+            for node in edge: 
+                degree_seq[node] += 1
         return degree_seq
 
 
