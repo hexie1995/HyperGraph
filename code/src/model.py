@@ -33,7 +33,8 @@ class GrowingHypergraph:
             num_added = 0
             
             while num_added < num_to_add: 
-                candidate = np.random.choice(self.H.nodes, 1)[0]
+                candidate = np.random.randint(0, self.H.num_nodes)
+                # candidate = np.random.choice(self.H.nodes, 1)[0]
                 if candidate not in e:
                     e_.add(candidate)
                     num_added += 1
