@@ -4,15 +4,25 @@ from collections import Counter
 
 class GrowingHypergraph:
     
-    def __init__(self, H = None):
+    def __init__(self, H = None, track_branching = True):
+        """
+        Unclear what we want track_branching for, but it might be interesting for things like community detection or visualization. 
+        """
         if H:
             H = xgi.classes.function.convert_labels_to_integers(H)
             self.H = H
         else:
             self.H = xgi.Hypergraph()
         
-    def add_edge(self, e):
-        self.H.add_edge(e) 
+        if track_branching: 
+            self.track_branching = True
+            self.branches = dict()
+            
+        
+    def add_edge(self, e, log_branch = True):
+        self.H.add_edge(e)
+        if log_branch: 
+            self.branches.update({self.H.num_edges -1: -1}) 
     
     def sample_edge(self, eta, gamma, beta, force_one_node = False):
         
@@ -21,6 +31,12 @@ class GrowingHypergraph:
         while len(e_) <= 0:
             # first, sample existing edge
             ix = np.random.randint(self.H.num_edges)
+            
+            # if we are tracking the branching process
+            # log that edge about to be formed was formed from edge ix. 
+            if self.track_branching:
+                self.branches.update({self.H.num_edges + 1 : ix})
+            
             e = self.H.edges.members(ix)
             
             if force_one_node: 
@@ -49,13 +65,57 @@ class GrowingHypergraph:
             for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add):
                 e_.add(i)
         
-        self.add_edge(e_)
+        self.add_edge(e_, log_branch = False)
     
+    def edge_predecessor(self, edge_ix):
+        """
+        return the index of the edge used to sample the supplied edge index
+        """
+        if not self.track_branching: 
+            raise(ValueError, "This model was not initialized to track the edge branching process.")
+        else:
+            return self.branches[edge_ix]
+    
+    def edge_ancestor(self, edge_ix):
+        """
+        return the root of the branching tree containing the supplied edge index
+        """
+        if not self.track_branching: 
+            raise(ValueError, "This model was not initialized to track the edge branching process.")
+        
+        ix = edge_ix
+        while self.branches[ix] != -1:
+            ix = self.branches[ix]
+        return ix
+          
+    def edge_lineage(self, edge_ix):
+        """
+        sequence of edges from the supplied edge index to the root of the branching tree containing the supplied edge index
+        """
+        if not self.track_branching: 
+            raise(ValueError, "This model was not initialized to track the edge branching process.")
+        
+        ix = edge_ix
+        lineage = [ix]
+        
+        while self.branches[ix] != -1:
+            ix = self.branches[ix]
+            lineage.append(ix)
+        
+        return lineage 
+        
     def degree_sequence(self):
         return self.H.nodes.degree.asnumpy()
     
     def edge_size_sequence(self):
         return self.H.edges.size.asnumpy()
+    
+    def rw_laplacian(self, **kwargs):
+        A = xgi.adjacency_matrix(self.H, **kwargs)
+        D = np.diag(A.sum(axis = 1))
+        D_inv = np.linalg.inv(D)
+        L = D_inv @ (D - A)
+        return L
     
     def intersection_profile(self, num_samples = int(1e6)):
         
@@ -81,10 +141,3 @@ class GrowingHypergraph:
             C[len(f), len(e), k] += 1
             
         return C / (2*num_samples)
-            
-        
-            
-            
-            
-        
-        
