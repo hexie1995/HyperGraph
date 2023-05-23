@@ -17,7 +17,11 @@ class GrowingHypergraph:
         if track_branching: 
             self.track_branching = True
             self.branches = dict()
-            
+        self.nodes = self.H.nodes    
+        self.num_nodes = self.H.num_nodes
+        self.num_edges = self.H.num_edges
+        self.edges = self.H.edges
+        
         
     def add_edge(self, e, log_branch = True):
         self.H.add_edge(e)

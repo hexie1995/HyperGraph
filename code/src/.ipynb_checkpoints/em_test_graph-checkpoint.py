@@ -25,7 +25,7 @@ def test_error_graph(parameters):
     
     for _ in range(100):
         H1 = GrowingHypergraph(H_temp)
-        e_ = H1.sample_edge(eta, gamma, beta, force_one_node = False)
+        e_ = H1.sample_edge_v1(eta, gamma, beta, force_one_node = False)
         heta, hgamma, hbeta = EM_update(e_, H_temp, ieta, igamma, ibeta, 100)
         eta_vec.append(heta)
         gamma_vec.append(hgamma)
@@ -54,7 +54,7 @@ wrapper_list.append(test_gamma)
 wrapper_list.append(test_beta)
 wrapper_list.append(init_eta)
 wrapper_list.append(init_gamma)
-wrapper_list.append(init_beat)
+wrapper_list.append(init_beta)
 
 combs = []
 
