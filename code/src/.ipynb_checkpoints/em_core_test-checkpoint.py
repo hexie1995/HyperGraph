@@ -5,6 +5,8 @@ import itertools
 import time
 from collections import Counter
 from multiprocessing import Pool
+from model import *
+from em_core import *
 
 
 class GrowingHypergraph:
