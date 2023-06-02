@@ -1,6 +1,8 @@
 import xgi
-import xgi.Hypergraph as Hypergraph
 import numpy as np
+import copy
+import math
+import scipy.special as ss
 from collections import Counter
 
 # +
@@ -34,10 +36,16 @@ class GrowingHypergraph():
         
         
         
-    def add_edge(self, e, log_branch = True):
+    def add_edge(self, e, log_branch = True, store_graphs = True):
+        if store_graphs:
+            H_temp = copy.deepcopy(self.H)
+            self.H_vecs.append(H_temp)
         self.H.add_edge(e)
         if log_branch: 
             self.branches.update({self.H.num_edges -1: -1}) 
+        if store_graphs:
+            self.e_vecs.append(e)
+            
     
     def sample_edge(self, eta, gamma, beta, force_one_node = False):
         
@@ -201,9 +209,9 @@ class GrowingHypergraph():
         # eta, gamma, beta are all vectorized.
 
         
-        if use_self = True:
-            H_vec = self.H_vec
-            e_vec = self.e_vec
+        if use_self:
+            H_vec = self.H_vecs
+            e_vec = self.e_vecs
             
 
 
@@ -397,7 +405,7 @@ class GrowingHypergraph():
         # each iteration of the heta and hbeta are averaged out over 100 runs of the EM itself
 
 
-        for _ in range(200):
+        for _ in range(100):
             H_vec.append(H_temp)
             H1 = GrowingHypergraph(H_temp)
             e_ = H1.sample_edge_v1(eta, gamma, beta, force_one_node = False)        
@@ -405,12 +413,8 @@ class GrowingHypergraph():
             e_vec.append(e_)
 
 
-        for _ in range(10):
-            eta_temp,gamma_temp,beta_temp,cor_temp = self.EM_update_vec(e_vec, H_vec, eta_temp,gamma_temp,beta_temp, 100)
-            eta_vec.append(eta_temp)
-            gamma_vec.append(gamma_temp)
-            beta_vec.append(beta_temp)
-            cor_vec.append(cor_temp)
+        eta_vec,gamma_vec,beta_vec,cor_vec = self.EM_update_vec(eta_temp,gamma_temp, beta_temp,100, H_vec, e_vec, use_self = False)
+  
 
 
         with open("error_vecs.txt", "a") as f:
