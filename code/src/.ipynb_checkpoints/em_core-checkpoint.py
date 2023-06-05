@@ -22,13 +22,13 @@ def E_step(e, H,  heta, hgamma, hbeta, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec):
         
         bscore = (hbeta**(b)*np.exp(hbeta))/(math.factorial(b))
         
-        score = ((1-heta)**(k))*(heta**(N_mu-k))*(hgamma**(k_prime))*((1-hgamma)**(Np-k_prime))*bscore
+        score = ((1-heta)**(k))*(heta**(N_mu-k))*(hgamma**(k_prime))*((1-hgamma)**(Np-k_prime))
         #print(score)
         pzx.append(score)
         
     total = sum(pzx)
     pzx_vec = [x/total for x in pzx]
-    return pzx_vec, total
+    return pzx_vec, total, bscore
 
 def M_step(pzx_vec, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec):
 
@@ -42,10 +42,19 @@ def M_step(pzx_vec, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec):
     #print(heta, hgamma, hbeta)
     return heta, hgamma, hbeta
 
+def Test_Correct(prev, num_of_edges, total, bscore):
+    
+    curr = np.log(total) + np.log(bscore) -np.log(num_of_edges)
+
+    return curr>=prev, curr
+
+
 def EM_update(e, H, eta, gamma, beta, max_iter):
     
     #intial guess
     heta, hgamma, hbeta = eta, gamma, beta
+    
+    hprev = -np.inf
     
     #intialize error term
     true_error = 1
@@ -66,16 +75,10 @@ def EM_update(e, H, eta, gamma, beta, max_iter):
     for i in range(num_of_edges):
         e_i = H.edges.members(i)
         N_mu = len(e_i)
-        #print(e_i)
-        #print(e.intersection(e_i))
         k = N_mu - len(e.intersection(e_i))
         Np  = N - N_mu
         k_prime = len(e.intersection(H.nodes-e_i))
-        
-        #print(e.intersection(H.nodes-e_i))
         new_added = len(e.difference(H.nodes))
-        #print(new_added)
-        
         
         k_vec.append(k)
         kp_vec.append(k_prime)
@@ -90,16 +93,19 @@ def EM_update(e, H, eta, gamma, beta, max_iter):
     #print("Nmuvec", Nmu_vec)
     #print("bvec", b_vec)
         
-        
+    correct = []
             
     count = 0
     while count<max_iter:
         
-        pzx_vec, total = E_step(e, H, heta, hgamma, hbeta, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec)
-        #print(pzx_vec)
-        #pzx_vec = [x/num_of_edges for x in pzx_vec]
+        pzx_vec, total, bscore = E_step(e, H, heta, hgamma, hbeta, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec)
+        cor, hprev = Test_Correct(hprev, num_of_edges, total, bscore) 
         heta, hgamma, hbeta = M_step(pzx_vec, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec)    
         count = count+1
+        correct.append(cor)
         
-    #print(pzx_vec)
-    return heta, hgamma, hbeta
+    #return heta, hgamma, hbeta
+    return heta, hgamma, hbeta, correct
+# -
+
+
