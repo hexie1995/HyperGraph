@@ -14,11 +14,11 @@ def E_step(e, H,  heta, hgamma, hbeta, k_vec, kp_vec, Np_vec, Nmu_vec, b_vec):
     
     for i in range(num_of_edges):
         # load saved information
-        N_mu = Nmu_vec[i]
-        k = k_vec[i]
-        Np  = Np_vec[i]
-        k_prime = kp_vec[i]
-        b = b_vec[i]
+        N_mu    = Nmu_vec[i]
+        k       =   k_vec[i]
+        Np      =  Np_vec[i]
+        k_prime =  kp_vec[i]
+        b       =   b_vec[i]
         
         bscore = (hbeta**(b)*np.exp(hbeta))/(math.factorial(b))
         
