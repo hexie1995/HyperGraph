@@ -5,7 +5,6 @@ import math
 import scipy.special as ss
 from collections import Counter
 
-# +
 class GrowingHypergraph():
     
     def __init__(self, H = None, track_branching = True, store_graphs = True):
@@ -22,7 +21,8 @@ class GrowingHypergraph():
         if track_branching: 
             self.track_branching = True
             self.branches = dict()
-            
+        
+        self.store_graphs = store_graphs
         if store_graphs:
             self.e_vecs = []
             self.H_vecs = []
@@ -34,17 +34,21 @@ class GrowingHypergraph():
         self.edges = self.H.edges
         self._hypergraph = self.H._hypergraph 
         
+        self.node_count_list = []
+        self.edge_count_list = []
         
         
     def add_edge(self, e, log_branch = True, store_graphs = True):
         if store_graphs:
             H_temp = copy.deepcopy(self.H)
             self.H_vecs.append(H_temp)
+            self.node_count_list.append(H_temp.num_nodes)
+            self.edge_count_list.append(H_temp.num_edges)
         self.H.add_edge(e)
         if log_branch: 
             self.branches.update({self.H.num_edges -1: -1}) 
         if store_graphs:
-            self.e_vecs.append(e)
+            self.e_vecs.append(set(e))
             
     
     def sample_edge(self, eta, gamma, beta, force_one_node = False):
@@ -198,241 +202,5 @@ class GrowingHypergraph():
             C[len(f), len(e), k] += 1
             
         return C / (2*num_samples)
-    
-    
-    def EM_update_vec(self, eta, gamma, beta, max_iter, H_vec = None, e_vec = None, use_self = True):
-
-
-        # note that e_vec is now a vector with the sequence of added edges over time
-        # here H and max_iter stays the same as before, with H being the initialized hypergraph, and max_iter the iteration of update
-        # the averaged output of the first iteration will be the guess of the next iteration, so on and so forth.
-        # eta, gamma, beta are all vectorized.
-
-        
-        if use_self:
-            H_vec = self.H_vecs
-            e_vec = self.e_vecs
-            
-
-
-        total_edge = H_vec[-1].num_edges
-
-        heta, hgamma, hbeta = eta, gamma, beta
-
-        #heta_vec = np.full((total_num_new, total_edge), np.mean(heta))
-        #hgamma_vec = np.full((total_num_new, total_edge), np.mean(hgamma))
-        #hbeta_vec = np.full((total_num_new, total_edge), np.mean(hbeta))
-
-        #print(heta_vec.shape)
-
-        hprev = -np.inf
-
-        #intialize error term
-        true_error = 1
-
-        KVEC = []
-        KPVEC = []
-        NPVEC = []
-        NMUVEC = []
-        BVEC = []
-        NUM_EDGES = []
-
-        for H,e in zip(H_vec, e_vec):
-
-            #facts about the H graph
-            num_of_edges = H.num_edges
-            N = H.num_nodes
-
-            #facts about the added edge
-            k_vec = []
-            kp_vec = []
-            Np_vec = []
-            Nmu_vec = []
-            b_vec = []
-
-            #calculate necessary vectors for EM
-            for i in range(num_of_edges):
-                e_i = H.edges.members(i)
-                N_mu = len(e_i)
-                k = N_mu - len(e.intersection(e_i))
-                Np  = N - N_mu
-                k_prime = len(e.intersection(H.nodes-e_i))
-                new_added = len(e.difference(H.nodes))
-
-
-                k_vec.append(k)
-                kp_vec.append(k_prime)
-                Np_vec.append(Np)
-                Nmu_vec.append(N_mu)
-                b_vec.append(new_added)
-
-
-            if num_of_edges<total_edge:
-                for _ in range(total_edge-num_of_edges):
-                    k_vec.append(0)
-                    kp_vec.append(0)
-                    Np_vec.append(0)
-                    Nmu_vec.append(0)
-                    b_vec.append(new_added)
-            # these are all numpy array matrix, list of lists, row = how many edges added, column = how many edges are in each time
-
-            KVEC.append(k_vec)
-            KPVEC.append(kp_vec)
-            NPVEC.append(Np_vec)
-            NMUVEC.append(Nmu_vec)
-            BVEC.append(b_vec)
-
-            # this is just a list, their length = how many edges added
-            NUM_EDGES.append(num_of_edges)
-
-        #print(KVEC)
-
-        KVEC = np.array(KVEC)
-        KPVEC = np.array(KPVEC)
-        NPVEC = np.array(NPVEC)
-        NMUVEC = np.array(NMUVEC)
-        BVEC = np.array(BVEC)
-        NUM_EDGES = np.array(NUM_EDGES)
-
-        #print(BVEC)
-
-        ######## Enter the vectorized iteration ########
-
-        correct = []
-
-
-        count = 0
-        while count<max_iter:
-
-
-            PZXVEC, total_vec, bscore_vec = self.E_step_vec(heta, hgamma, hbeta, KVEC, KPVEC, NPVEC, NMUVEC, BVEC, NUM_EDGES)
-            cor= self.Test_Correct_vec(NUM_EDGES, total_vec, bscore_vec) 
-            heta, hgamma, hbeta = self.M_step_vec(PZXVEC, KVEC, KPVEC, NPVEC, NMUVEC, BVEC, NUM_EDGES) 
-
-            count = count+1
-            correct.append(cor)
-
-
-            #print("HETA", heta_vec)
-            #print(hgamma_vec)
-            #print(hbeta_vec)
-
-
-        #return heta, hgamma, hbeta
-        return heta, hgamma, hbeta, correct
-
-    def E_step_vec(self, heta, hgamma, hbeta, KVEC, KPVEC, NPVEC, NMUVEC, BVEC, NUM_EDGES):
-
-        s1 = np.power((1-heta), KVEC)
-        s2 = np.power(heta, (NMUVEC- KVEC))
-        s3 = np.power((1-hgamma), (NPVEC - KPVEC))
-        s4 = np.power(hgamma, KPVEC)
-
-
-        #print(s1)
-
-        # this step turn hbeta into a matrix that has the same dimension as the others 
-        # however this matrix should be the same on each row 
-        bscore_vec = (np.power(hbeta, BVEC)*np.exp(hbeta))/(ss.factorial(BVEC))
-
-        #print(bscore_vec)
-
-        # this step will return a matrxi num_of_added_edge(i.e time steps T) x num_of_edges at the last time step (i.e. H_n.num_edges) 
-        # and the upper left corner of this matrix will be all 0 because those are just the missing information from each time slot
-        # and that will be okay because the corresponding k is also 0 there
-        # dimension of pzx and KVEC shoud be exactly the same.
-
-        pzx = s1*s2*s3*s4
-        #print(pzx)
-
-        pzx_vec= []        
-        total_vec=[]
-
-
-        # this is a necessary step to calculate for each ROW of pzx the summation and the averaged value. 
-        for i,ne in enumerate(NUM_EDGES):
-
-            total = sum(pzx[i][0:ne])
-            total_vec.append(total)
-            pzx_vec.append([x/total for x in pzx[i]])
-
-        PZXVEC = np.array(pzx_vec)
-
-        #print(PZXVEC)
-        return PZXVEC, total_vec, bscore_vec
-
-    def M_step_vec(self, PZXVEC, KVEC, KPVEC, NPVEC, NMUVEC, BVEC, NUM_EDGES):
-
-        heta =  1-(sum(np.einsum('ij, ij->i', KVEC, PZXVEC))/sum(np.einsum('ij, ij->i',NMUVEC, PZXVEC)))
-        hgamma = sum(np.einsum('ij, ij->i',KPVEC, PZXVEC))/sum(np.einsum('ij, ij->i', NPVEC, PZXVEC))
-
-        # we only consider poisson distribution for now, the optimal beta is equvilant to lambda in poisson.
-        hbeta = sum(np.einsum('ij, ij->i',BVEC, PZXVEC))/np.sum(PZXVEC)
-        #print(hbeta)
-
-        return heta, hgamma, hbeta
-
-
-    def Test_Correct_vec(self, NUM_EDGES, total_vec, bscore_vec):
-
-        curr_vec = np.sum(np.log(total_vec) + np.log(bscore_vec[:,0]) -np.log(NUM_EDGES))
-
-        return curr_vec
-
-    
-
-    def Test_error_random_graph(self, parameters):
-        
-        # parameter consists of 6 different values, true eta and initiliazed eta and etc. 
-        # return a list of marginal log likelihood and thus will see how fast it converges
-        
-        
-        H0 = xgi.random_hypergraph(50, [0.1, 0.01])
-        eta, gamma, beta, ieta,igamma,ibeta = parameters
-
-        eta_temp,gamma_temp,beta_temp = ieta,igamma,ibeta
-
-        eta_vec= []
-        gamma_vec=[]
-        beta_vec=[]
-        cor_vec = []
-
-        H_temp = H0
-
-        e_vec = []
-        H_vec = []
-        # test a hypergraph that 100 edges has been added since the initial state
-        # each iteration of the heta and hbeta are averaged out over 100 runs of the EM itself
-
-
-        for _ in range(100):
-            H_vec.append(H_temp)
-            H1 = GrowingHypergraph(H_temp)
-            e_ = H1.sample_edge_v1(eta, gamma, beta, force_one_node = False)        
-            H_temp = H1.H
-            e_vec.append(e_)
-
-
-        eta_vec,gamma_vec,beta_vec,cor_vec = self.EM_update_vec(eta_temp,gamma_temp, beta_temp,100, H_vec, e_vec, use_self = False)
-  
-
-
-        with open("error_vecs.txt", "a") as f:
-            print(np.mean(eta_vec)-eta ,np.mean(gamma_vec)-gamma,np.mean(beta_vec)-beta, file=f)
-
-        #np.save("results/" + "ETA_" + str(parameters) + ".npy", eta_vec)      
-        #np.save("results/" + "GAMMA_" + str(parameters) + ".npy", gamma_vec)      
-        #np.save("results/" + "BETA_" + str(parameters) + ".npy", beta_vec)      
-        np.save("results/" + "COR_" + str(parameters) + ".npy", cor_vec)      
-
-        return cor_vec    
-
-    
-    
-    
-    
-    
-    
-# -
 
 
