@@ -36,6 +36,8 @@ class EM:
         done = False
         i = 0
         
+        self.base_H = H.H
+        
         # do EM until convergence
         while not done: 
             self.E_step()
@@ -61,10 +63,10 @@ class EM:
         # sequence of number nodes in hypergraph at each timestep
         # grows in time as nodes get added
         node_counts = []
-        nodes = set()
+        self.nodes = set()
         for x in xgi.to_hyperedge_list(H.H):
-            nodes = nodes.union(x)
-            node_counts.append(len(nodes))
+            self.nodes = self.nodes.union(x)
+            node_counts.append(len(self.nodes))
         
         self.node_counts = np.array(node_counts)
         
@@ -79,10 +81,10 @@ class EM:
         # number of novel nodes per new edge
         # NOTE: could this be obtained from node_counts without recalculating, right?
         novel_node_vec = []
-        seen = set()
+        self.seen = set()
         for e in H.H.edges.members():
-            novel_node_vec.append(len(e.difference(seen)))
-            seen = seen.union(e)
+            novel_node_vec.append(len(e.difference(self.seen)))
+            self.seen = self.seen.union(e)
         
         self.num_novel_nodes = np.array(novel_node_vec)
         
@@ -93,7 +95,10 @@ class EM:
         other_nodes_mat = np.tril(other_nodes_mat) 
         np.fill_diagonal(other_nodes_mat, 0) 
         self.other_nodes = other_nodes_mat
+ 
     
+
+
     def marginal_log_likelihood(self):
         """
         Compute the marginal log likelihood with currently stored parameters and arrays
@@ -155,15 +160,73 @@ class EM:
         self.pars["gamma"] = self.nodes_from_hypergraph_likelihood.m_step(self.other_nodes, self.CHI)
             
     def predict(self, new_candidate_edges):
-        print("not implemented")    
+        
+        new_edge_counts = len(new_candidate_edges)
+        H_comp = self.base_H
+        base_edges = H_comp.num_edges
+        
+        H_pred = xgi.Hypergraph()
+        H_pred.add_edges_from(new_candidate_edges)
+        
+        H_comp.add_edges_from(new_candidate_edges)
+        
+        # sequences of edge sizes, in order
+        edge_sizes = H_pred.edges.size.asnumpy()
+    
+    
+        # number of novel edges per every edge in the new list
+        novel_node_vec = []
+        for e in H_pred.edges.members():
+            novel_node_vec.append(len(e.difference(self.seen)))
+
+        num_novel_nodes = np.array(novel_node_vec)
         
         
+        # sequence of number nodes in hypergraph at each timestep
+        # grows in time as nodes get added
+        node_counts = []
+        for x in xgi.to_hyperedge_list(H_pred):
+            nodes = self.nodes.union(x)
+            node_counts.append(len(nodes))
+        
+        node_counts = np.array(node_counts)
+        
+        ############## THIS IS THE MAIN DIFFERENCE FROM EVERYTHING ELSE#################
+        ############## THIS INCLUDE THE INTERSECTION BETWEEN THE NEW LIST OF EDGES AND OLD LIST OF EDGES###############
+        
+        IX = xgi.intersection_profile(H_comp).toarray()
+        IX = np.tril(IX) 
+        np.fill_diagonal(IX, 0) 
+        intersection_sizes = IX[-new_edge_counts:, :base_edges].transpose()
         
         
+        novel_nodes_mat = np.tile(num_novel_nodes,(base_edges,1))
+        edge_sizes_mat = np.tile(edge_sizes,(base_edges,1))
+        node_counts_mat = np.tile(node_counts,(base_edges,1))
+    
+        other_nodes = edge_sizes_mat - novel_nodes_mat - intersection_sizes
         
+        #other_nodes = (edge_sizes - num_novel_nodes)[:,np.newaxis] - intersection_sizes
+        
+        s1 = self.edge_sample_likelihood(selected     = intersection_sizes,
+                                         total        = edge_sizes_mat,  
+                                         eta          = self.pars["eta"])
+        
+        s2 = self.novel_nodes_likelihood(novel_nodes_mat, beta = self.pars["beta"])
+        
+        s3 = self.nodes_from_hypergraph_likelihood(other_nodes, gamma = self.pars["gamma"])
+        
+        s3 = s3*node_counts_mat**(-1.0*other_nodes)
+        
+        
+        self.PRED = s1*s2*s3
+            
+        return np.mean(self.PRED, axis = 0)
+        
+
 ################################################################################
-################################################################################
-################################################################################
+# ###############################################################################
+# ###############################################################################
 
 
 
