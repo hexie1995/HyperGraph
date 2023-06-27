@@ -71,6 +71,7 @@ class GrowingHypergraph:
                 e_.add(i)
         
         self.add_edge(e_, log_branch = False)
+        return e_
         
         
     def sample_edge_v1(self, eta, gamma, beta, force_one_node = False):
