@@ -172,7 +172,7 @@ class EM:
         
         # sequences of edge sizes, in order
         edge_sizes = H_pred.edges.size.asnumpy()
-    
+        #print("edge_sizes", edge_sizes)
     
         # number of novel edges per every edge in the new list
         novel_node_vec = []
@@ -180,7 +180,7 @@ class EM:
             novel_node_vec.append(len(e.difference(self.seen)))
 
         num_novel_nodes = np.array(novel_node_vec)
-        
+        #print("num_novel_nodes", num_novel_nodes)
         
         # sequence of number nodes in hypergraph at each timestep
         # grows in time as nodes get added
@@ -190,6 +190,7 @@ class EM:
             node_counts.append(len(nodes))
         
         node_counts = np.array(node_counts)
+        #print("node_counts", node_counts)
         
         ############## THIS IS THE MAIN DIFFERENCE FROM EVERYTHING ELSE#################
         ############## THIS INCLUDE THE INTERSECTION BETWEEN THE NEW LIST OF EDGES AND OLD LIST OF EDGES###############
@@ -198,36 +199,61 @@ class EM:
         IX = np.tril(IX) 
         np.fill_diagonal(IX, 0) 
         intersection_sizes = IX[-new_edge_counts:, :base_edges].transpose()
-        
+        #print("intersection_sizes",intersection_sizes)
+    
         
         novel_nodes_mat = np.tile(num_novel_nodes,(base_edges,1))
+        #print("novel_nodes_mat", novel_nodes_mat)
+        
         edge_sizes_mat = np.tile(edge_sizes,(base_edges,1))
+        #print("edge_size_mat",edge_sizes_mat)
+        
         node_counts_mat = np.tile(node_counts,(base_edges,1))
-    
+        #print("node_counts_mat", node_counts_mat)
+        
         other_nodes = edge_sizes_mat - novel_nodes_mat - intersection_sizes
+        #print("other_nodes", other_nodes)
+        #print(np.all((edge_sizes_mat - novel_nodes_mat)>=0))
+        other_nodes[other_nodes<0]=0
+        #print(np.all(other_nodes>=0))
+        
+        #print((edge_sizes - num_novel_nodes)[:,np.newaxis].shape)
         
         #other_nodes = (edge_sizes - num_novel_nodes)[:,np.newaxis] - intersection_sizes
         
         s1 = self.edge_sample_likelihood(selected     = intersection_sizes,
-                                         total        = edge_sizes_mat,  
+                                         total        = edge_sizes_mat, 
                                          eta          = self.pars["eta"])
+        #print("s1", s1)
+        #print(s1.shape)
+        #print(np.any(np.isposinf(s1)))
         
         s2 = self.novel_nodes_likelihood(novel_nodes_mat, beta = self.pars["beta"])
+        #print("s2", s2)
+        #print(s2.shape)
+        #print(np.any(np.isposinf(s2)))
         
         s3 = self.nodes_from_hypergraph_likelihood(other_nodes, gamma = self.pars["gamma"])
+        #print("s3", s3)
+        #print(np.any(np.isposinf(s3)))
         
         s3 = s3*node_counts_mat**(-1.0*other_nodes)
-        
+        #print("s3.1", s3)
+        #print(np.any(np.isposinf(s3)))
         
         self.PRED = s1*s2*s3
-            
+        #print("self.PRED", self.PRED)
+        #print(self.PRED.shape)    
+        
+        
         return np.mean(self.PRED, axis = 0)
         
 
-################################################################################
-# ###############################################################################
-# ###############################################################################
+""
+###############################################################################
+###############################################################################
 
+""
 
 
 
