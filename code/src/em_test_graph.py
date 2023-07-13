@@ -10,8 +10,6 @@ from multiprocessing import Pool
 #from model import *
 from model_oop import *
 
-
-
 def test_error_graph(parameters):
     
     #p2 = np.array([[0.6, 0.01], [0.01, 0.6]])

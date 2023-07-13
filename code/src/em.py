@@ -42,7 +42,9 @@ class EM:
         while not done: 
             self.E_step()
             self.M_step()
-            self.ll_history.append(self.marginal_log_likelihood())
+            ll = self.marginal_log_likelihood()
+            self.ll_history.append(ll)
+            print(f"Step {i}: marginal ll = {ll}")
             if (self.ll_history[-1] - self.ll_history[-2] < tol) or i > max_iter:
                 done = True
             i += 1
