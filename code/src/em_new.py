@@ -11,15 +11,16 @@ class EM:
         Start with the non-gauranteed version and move on. 
         """
         self.ll_history = []
+        self.pars = {"eta" : 0.5, "beta" : 0.5, "gamma" : 0.5}
         
-        self.pars = {"eta" : 0.5, "beta" : 0.5, "gamma" : 0.2}
+        self.H = H
         
         self.edge_sample_likelihood = likelihoods.edge_sample_likelihood
+        
         self.novel_nodes_likelihood = likelihoods.novel_nodes_likelihood
         
         self.nodes_from_hypergraph_likelihood = likelihoods.nodes_from_hypergraph_likelihood
         
-        self.H = H
         
         self.initialize_likelihood_array()
         self.form_edge_intersection_array()
@@ -105,6 +106,7 @@ class EM:
         
         I, J, K, L = np.meshgrid(k, k, k, k, indexing = "ij")
         
+        
         s1 = self.edge_sample_likelihood(K, J, eta = self.pars["eta"])
         s2 = self.novel_nodes_likelihood(L, beta = self.pars["beta"])
         s3 = self.nodes_from_hypergraph_likelihood(I - K - L, gamma = self.pars["gamma"])
@@ -117,10 +119,9 @@ class EM:
         self.likelihood_array[:,:,:,:] = P[self.edge_sizes,:,:,:]
         CHI = self.likelihood_array*self.intersection_array
         
-        # CHI = CHI / CHI.sum(axis = (1, 2, 3))[:, None, None, None]
+        CHI = CHI / CHI.sum(axis = (1, 2, 3))[:, None, None, None]
         
         self.CHI = CHI
-        return P
         
         
 
@@ -129,3 +130,21 @@ class EM:
     
     
     
+# likelihoods
+# maybe not the nicest API yet, we'll see
+        
+# def novel_nodes_pmf(x, beta):
+#     P = (beta**x)*np.exp(beta)/(ss.factorial(x))
+#     P[x < 0] = 0
+#     return P
+   
+# def guaranteed_edge_sample_pmf(x, t, eta):
+#     M = (eta**(x-1))*((1-eta)**(t-x)) # ?
+#     M[x == 0] = 0
+#     M[t < x] = 0
+#     return M
+
+# def nodes_from_hypergraph_pmf(x, gamma):
+#     M = (gamma**x)*np.exp(-gamma)/(ss.factorial(x))
+#     M[x < 0] = 0
+#     return M
