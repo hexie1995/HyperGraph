@@ -22,10 +22,7 @@ class EdgeSampleLikelihood(Likelihood):
     
     def __call__(self, selected, total, **pars):
         
-        L = self.pmf(selected, total, **pars) 
-        L = np.tril(L)
-        np.fill_diagonal(L, 0)
-        return L
+        return self.pmf(selected, total, **pars) 
 
     def m_step(self, selected, total, chi):
         
@@ -39,7 +36,7 @@ class NovelNodesLikelihood(Likelihood):
     def __call__(self, num_novel_nodes, **pars):
         
         L = self.pmf(num_novel_nodes, **pars)
-        return np.tril(L) 
+        return L
     
     def m_step(self, num_novel_nodes, chi):
         return self.m_step(num_novel_nodes, chi)
@@ -51,7 +48,7 @@ class NodesFromHypergraphLikelihood(Likelihood):
     def __call__(self, num_nodes_to_add, **pars):
         # need to check this
         L = self.pmf(num_nodes_to_add, **pars)
-        return np.tril(L)
+        return L
     
     def m_step(self, num_nodes_to_add, chi):
         return self.m_step(num_nodes_to_add, chi)
@@ -81,6 +78,7 @@ esl = EdgeSampleLikelihood(
 def guaranteed_edge_sample_pmf(x, t, eta):
     M = (eta**(x-1))*((1-eta)**(t-x)) # ?
     M[x == 0] = 0
+    M[t < x] = 0
     return M
 
 def guaranteed_edge_sample_m_step(x, t, chi):
@@ -95,8 +93,10 @@ edge_sample_likelihood = EdgeSampleLikelihood(
     )
 
 # addition of novel nodes not previously seen in the hypergraph
-def novel_nodes_pmf(k, beta):
-     return (beta**k)*np.exp(beta)/(ss.factorial(k))
+def novel_nodes_pmf(x, beta):
+    P = (beta**x)*np.exp(-beta)/(ss.factorial(x))
+    P[x < 0] = 0
+    return P
 
 def novel_nodes_m_step(k, chi):
     return k.mean()
@@ -104,10 +104,19 @@ def novel_nodes_m_step(k, chi):
 novel_nodes_likelihood = NovelNodesLikelihood(pmf = novel_nodes_pmf, m_step = novel_nodes_m_step)
 
 # addition of nodes from rest of hypergraph
-def nodes_from_hypergraph_pmf(k, gamma):
-    return (gamma**k)*np.exp(-gamma)/(ss.factorial(k))
+def nodes_from_hypergraph_pmf(x, gamma):
+    M = (gamma**x)*np.exp(-gamma)/(ss.factorial(x))
+    M[x < 0] = 0
+    return M
 
 def nodes_from_hypergraph_m_step(x, chi):
     return (np.tril(chi, -1)*x).sum(axis = 1).mean()
 
 nodes_from_hypergraph_likelihood = NodesFromHypergraphLikelihood(pmf = nodes_from_hypergraph_pmf, m_step = nodes_from_hypergraph_m_step)
+
+
+# TODO
+
+# - need to adjust the M-step estimators
+# - need to implement the EM training loop, similar to prior implementation, probably quite fast
+# - need to confidently implement marginal log-likelihood and check 

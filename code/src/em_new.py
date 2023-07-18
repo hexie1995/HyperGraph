@@ -2,7 +2,8 @@ import xgi
 import numpy as np
 import math
 import scipy.special as ss
-from . import likelihoods
+import likelihoods
+# from . import likelihoods
 
 class EM:
     
@@ -20,7 +21,6 @@ class EM:
         self.novel_nodes_likelihood = likelihoods.novel_nodes_likelihood
         
         self.nodes_from_hypergraph_likelihood = likelihoods.nodes_from_hypergraph_likelihood
-        
         
         self.initialize_likelihood_array()
         self.form_edge_intersection_array()
@@ -82,16 +82,42 @@ class EM:
         self.intersection_array = K
 
         self.ix = self.intersection_array > 0
+    
+    def fit(self, pars = None, max_iter = 100, tol = 1e-6):
+        """
+        main loop: initializes parameters and arrays encoding 
+        topology, then alternates E and M steps until convergence
+        """
         
+        # initial guess, if not given then start with a default guess.
+        if pars:
+            self.pars = pars
+        else:   
+            self.pars = {"eta" : 0.1, "beta" : 0.1, "gamma" : 0.7}
+
+        # initialize for main loop
+        self.ll_history.append(self.marginal_log_likelihood())
+        done = False
+        i = 0
+        
+        # do EM until convergence
+        while not done: 
+            self.E_step()
+            self.M_step()
+            ll = self.marginal_log_likelihood()
+            self.ll_history.append(ll)
+            print(f"Step {i}: marginal ll = {ll}")
+            if (self.ll_history[-1] - self.ll_history[-2] < tol) or i > max_iter:
+                done = True
+            i += 1
+       
     def marginal_log_likelihood(self):
         """
         at the moment, only implemented to be called within the EM algorithm
         
         this has good vibes but may not be all the way correct
         """
-        
-        return np.nansum(np.log(self.likelihood_array)*self.intersection_array)
-        
+        return np.log(np.nansum(self.likelihood_array*self.intersection_array))
         
     def E_step(self):
         
@@ -122,14 +148,40 @@ class EM:
         CHI = CHI / CHI.sum(axis = (1, 2, 3))[:, None, None, None]
         
         self.CHI = CHI
-        
-        
+    
+    def M_step(self):
+        k_max = self.edge_sizes.max()
+        k = np.arange(k_max + 1)
 
+        # I is the size of e
+        # J is the size of f
+        # K is the size of e \cap f
+        # L is the number of additional novel nodes that 
+        # must be added 
+        
+        I, J, K, L = np.meshgrid(k, k, k, k, indexing = "ij")
+        
+        # these updates have good vibes but are probably not fully correct yet
         
         
-    
-    
-    
+        self.pars["eta"] = np.nansum(self.CHI*(K[self.edge_sizes,:,:,:]-1)) / np.nansum(self.CHI*(self.edge_sizes[:,None, None, None] - K[self.edge_sizes,:,:,:]))
+        
+        self.pars["beta"] = np.nanmean(np.sum(self.CHI*L[self.edge_sizes,:,:,:], (1, 2, 3)))
+        
+        self.pars["gamma"] = np.nanmean(np.sum(self.CHI*((I-K-L)[self.edge_sizes,:,:,:]), (1, 2, 3)))
+        
+        
+        
+        """
+        should turn out to something like (after implementing these methods): 
+        
+        self.pars["eta"] = self.edge_sample_likelihood.m_step(self.intersection_array, self.CHI)
+        
+        self.pars["beta"] = self.novel_nodes_likelihood.m_step(self.intersection_array, self.CHI)
+        
+        self.pars["gamma"] = self.nodes_from_hypergraph_likelihood.m_step(self.intersection_array, self.CHI)   
+        """
+
 # likelihoods
 # maybe not the nicest API yet, we'll see
         
