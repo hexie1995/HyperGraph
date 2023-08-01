@@ -181,3 +181,22 @@ class GrowingHypergraph:
             C[len(f), len(e), k] += 1
             
         return C / (2*num_samples)
+    
+    def edge_neighborhood(self, eid, prior_only = False, as_node_sets = False):
+        
+        e = self.H.edges.members(eid)
+        neighbor_edges = []
+        for i in e: 
+            for eid_ in self.H.nodes.memberships(i):
+                if prior_only and eid_ >= eid: 
+                    pass 
+                else:
+                    neighbor_edges.append(eid_)
+                    
+        neighbor_edges = set(neighbor_edges)
+        if as_node_sets: 
+            return [self.H.edges.members(eid_) for eid_ in neighbor_edges]
+        else: 
+            return neighbor_edges
+        
+        
