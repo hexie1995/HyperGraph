@@ -27,7 +27,8 @@ class GrowingHypergraph:
     def add_edge(self, e, log_branch = True):
         self.H.add_edge(e)
         if log_branch: 
-            self.branches.update({self.H.num_edges -1: -1}) 
+            self.branches.update({self.H.num_edges - 1: -1}) 
+        self.num_edges += 1
     
     def sample_edge(self, eta, gamma, beta, force_one_node = False):
         
@@ -73,40 +74,6 @@ class GrowingHypergraph:
         self.add_edge(e_, log_branch = False)
         return e_
         
-        
-    def sample_edge_v1(self, eta, gamma, beta, force_one_node = False):
-        
-        e_ = set()
-        
-        while len(e_) <= 0:
-            # first, sample existing edge
-            ix = np.random.randint(self.H.num_edges)
-            e = self.H.edges.members(ix)
-            
-            if force_one_node: 
-                i = np.random.choice(list(e))
-                e_.add(i)
-            
-            for i in e:
-                if np.random.rand() < eta :
-                    e_.add(i)
-            
-            # then, add unrelated nodes from graph
-            node_left   =  self.H.nodes-e
-
-            for i in node_left:
-                if np.random.rand() < gamma :
-                    e_.add(i)
-            
-            
-            # then, add completely novel nodes
-            num_to_add = np.random.poisson(beta)
-            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add):
-                e_.add(i)
-        
-        self.add_edge(e_)
-        return e_
-    
     def edge_predecessor(self, edge_ix):
         """
         return the index of the edge used to sample the supplied edge index
@@ -183,14 +150,13 @@ class GrowingHypergraph:
         return C / (2*num_samples)
     
     def edge_neighborhood(self, eid, prior_only = False, as_node_sets = False):
-        
+        """
+        """
         e = self.H.edges.members(eid)
         neighbor_edges = []
         for i in e: 
             for eid_ in self.H.nodes.memberships(i):
-                if prior_only and eid_ >= eid: 
-                    pass 
-                else:
+                if ((not prior_only) or (eid_ <= eid)) and (eid_ != eid): 
                     neighbor_edges.append(eid_)
                     
         neighbor_edges = set(neighbor_edges)
@@ -198,5 +164,21 @@ class GrowingHypergraph:
             return [self.H.edges.members(eid_) for eid_ in neighbor_edges]
         else: 
             return neighbor_edges
+    
+    def new_node_sequence(self):
+        """
+        entry t of this list is the id of the most recent node added by time t
+        used for novel node calculations and things like that
+        """
+        n_max = 0
+        timesteps = [0 for _ in range(len(self.H.edges))]
+        for eid in self.H.edges:
+            e = self.H.edges.members(eid)
+            i_max = max(e)
+            if i_max > n_max: 
+                n_max = i_max
+            timesteps[eid] = n_max
+        return timesteps
+        
         
         
