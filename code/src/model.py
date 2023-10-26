@@ -1,6 +1,7 @@
 import xgi
 import numpy as np
 from collections import Counter
+import random
 
 class GrowingHypergraph:
     
@@ -152,40 +153,53 @@ class GrowingHypergraph:
             
         return C / (2*num_samples)
     
-    def intersection_profile(self, randomize_eids = False, interval = 1):
+    def intersection_profile(self, randomize = False, interval = 1):
+        
+        if randomize:
+            GH = self.random_reindexed_hypergraph()
+        else: 
+            GH = self
+        
         d = dict()
         
-        if randomize_eids:  
-            print("randomized eids not implemented yet")
-            return None
-        
-        eids = list(self.H.edges)
+        eids = list(GH.H.edges)
         m_edges = len(eids)
         
-        timesteps = np.arange(0, m_edges// interval)*interval
+        timesteps = np.arange(1, m_edges // interval)*interval
         
-        for i in range(0, m_edges// interval):
+        for i in range(0, m_edges // interval-1):
             eid = eids[timesteps[i]]
-            e   = self.H.edges.members(eid)
-            de  = self.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
+            e   = GH.H.edges.members(eid)
+            de  = GH.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
             
             for e_ in de: 
                 k = len(e.intersection(e_))
                 if k not in d: 
-                    d[k] = np.zeros(m_edges// interval)
+                    d[k] = np.zeros((m_edges // interval) - 1)
                 d[k][i] += 1
         
 
-        D = {k : np.cumsum(d[k]) / (range(1, m_edges//interval+1)*(timesteps - 1)/2) for k in d}
+        D = {k : np.cumsum(d[k]) / (range(1, m_edges//interval)*(timesteps)) for k in d}
         
-        
+        # return d, timesteps
         return D, timesteps
 
-    
-    def edge_neighborhood(self, eid, prior_only = False, eid_map = None, as_node_sets = False):
-        """
-        """
+    def random_reindexed_hypergraph(self):
+        eids = list(self.H.edges)
+        random.shuffle(eids)
         
+        H = xgi.Hypergraph()
+        for i in range(len(eids)):
+            H.add_edge(self.H.edges.members(eids[i]))
+        
+        return GrowingHypergraph(H, track_branching = False)
+        
+        
+
+    
+    def edge_neighborhood(self, eid, prior_only = False,as_node_sets = False):
+        """
+        """
         
         e = self.H.edges.members(eid)
         neighbor_edges = []
