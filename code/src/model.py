@@ -124,7 +124,10 @@ class GrowingHypergraph:
         L = D_inv @ (D - A)
         return L
     
-    def intersection_profile(self, num_samples = int(1e6)):
+    def intersection_profile_(self, num_samples = int(1e6)):
+        """
+        deprecated, sampling-based, not time-dependent
+        """
         
         edge_sizes = [len(self.H.edges.members(e)) for e in self.H.edges]
         # min_edge_size = min(edge_sizes)
@@ -149,9 +152,41 @@ class GrowingHypergraph:
             
         return C / (2*num_samples)
     
-    def edge_neighborhood(self, eid, prior_only = False, as_node_sets = False):
+    def intersection_profile(self, randomize_eids = False, interval = 1):
+        d = dict()
+        
+        if randomize_eids:  
+            print("randomized eids not implemented yet")
+            return None
+        
+        eids = list(self.H.edges)
+        m_edges = len(eids)
+        
+        timesteps = np.arange(0, m_edges// interval)*interval
+        
+        for i in range(0, m_edges// interval):
+            eid = eids[timesteps[i]]
+            e   = self.H.edges.members(eid)
+            de  = self.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
+            
+            for e_ in de: 
+                k = len(e.intersection(e_))
+                if k not in d: 
+                    d[k] = np.zeros(m_edges// interval)
+                d[k][i] += 1
+        
+
+        D = {k : np.cumsum(d[k]) / (range(1, m_edges//interval+1)*(timesteps - 1)/2) for k in d}
+        
+        
+        return D, timesteps
+
+    
+    def edge_neighborhood(self, eid, prior_only = False, eid_map = None, as_node_sets = False):
         """
         """
+        
+        
         e = self.H.edges.members(eid)
         neighbor_edges = []
         for i in e: 
