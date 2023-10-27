@@ -1,6 +1,7 @@
 import xgi
 import numpy as np
 from collections import Counter
+import random
 
 class GrowingHypergraph:
     
@@ -124,7 +125,10 @@ class GrowingHypergraph:
         L = D_inv @ (D - A)
         return L
     
-    def intersection_profile(self, num_samples = int(1e6)):
+    def intersection_profile_(self, num_samples = int(1e6)):
+        """
+        deprecated, sampling-based, not time-dependent
+        """
         
         edge_sizes = [len(self.H.edges.members(e)) for e in self.H.edges]
         # min_edge_size = min(edge_sizes)
@@ -149,9 +153,54 @@ class GrowingHypergraph:
             
         return C / (2*num_samples)
     
-    def edge_neighborhood(self, eid, prior_only = False, as_node_sets = False):
+    def intersection_profile(self, randomize = False, interval = 1):
+        
+        if randomize:
+            GH = self.random_reindexed_hypergraph()
+        else: 
+            GH = self
+        
+        d = dict()
+        
+        eids = list(GH.H.edges)
+        m_edges = len(eids)
+        
+        timesteps = np.arange(1, m_edges // interval)*interval
+        
+        for i in range(0, m_edges // interval-1):
+            eid = eids[timesteps[i]]
+            e   = GH.H.edges.members(eid)
+            de  = GH.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
+            
+            for e_ in de: 
+                k = len(e.intersection(e_))
+                if k not in d: 
+                    d[k] = np.zeros((m_edges // interval) - 1)
+                d[k][i] += 1
+        
+
+        D = {k : np.cumsum(d[k]) / (range(1, m_edges//interval)*(timesteps)) for k in d}
+        
+        # return d, timesteps
+        return D, timesteps
+
+    def random_reindexed_hypergraph(self):
+        eids = list(self.H.edges)
+        random.shuffle(eids)
+        
+        H = xgi.Hypergraph()
+        for i in range(len(eids)):
+            H.add_edge(self.H.edges.members(eids[i]))
+        
+        return GrowingHypergraph(H, track_branching = False)
+        
+        
+
+    
+    def edge_neighborhood(self, eid, prior_only = False,as_node_sets = False):
         """
         """
+        
         e = self.H.edges.members(eid)
         neighbor_edges = []
         for i in e: 
