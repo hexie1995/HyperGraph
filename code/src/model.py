@@ -74,7 +74,40 @@ class GrowingHypergraph:
         
         self.add_edge(e_, log_branch = False)
         return e_
+    
+    
+    def sample_edge_alternative(self, method, expected_from_graph, expected_new):
+        """
+        growing Erdos-Renyi graph or preferential attachment graph
+        """
         
+        e_ = set()
+        
+        # num_to_add = 1 + np.random.poisson(expected_from_graph - 1)
+        num_to_add = 1 + np.random.binomial(self.H.num_nodes, expected_from_graph/self.H.num_nodes)
+        
+        num_added = 0
+        
+        
+        if method == "ER": 
+            to_add = np.random.choice(range(self.H.num_nodes), size = num_to_add, replace = False)
+        elif method == "PA":
+            d = self.degree_sequence()
+            dist = d / d.sum()
+            to_add = np.random.choice(range(self.H.num_nodes), size = num_to_add, replace = False, p = dist)
+        
+        for i in to_add:   
+            e_.add(i)
+        
+    
+        num_new = np.random.poisson(expected_new)
+        for i in range(self.H.num_nodes, self.H.num_nodes + num_new):
+            e_.add(i)
+        
+        self.add_edge(e_, log_branch = False)
+        return e_
+     
+    
     def edge_predecessor(self, edge_ix):
         """
         return the index of the edge used to sample the supplied edge index
@@ -125,23 +158,28 @@ class GrowingHypergraph:
         L = D_inv @ (D - A)
         return L
     
-    def intersection_profile_(self, num_samples = int(1e6)):
+    def intersection_array(self, num_samples = int(1e6), normalize = False):
         """
         deprecated, sampling-based, not time-dependent
         """
         
-        edge_sizes = [len(self.H.edges.members(e)) for e in self.H.edges]
-        # min_edge_size = min(edge_sizes)
-        max_edge_size = max(edge_sizes)
+        k_max = self.edge_size_sequence().max()
+         
+        C = np.zeros((k_max+1, k_max+1, k_max+1))
         
-        C = np.zeros((max_edge_size+1, max_edge_size+1, max_edge_size+1))
         
+        num_edges = self.H.num_edges
+        
+        random_nums = np.random.randint(0, num_edges, size = (2*num_samples, 2))
+                
+        current_random_num = 0
         for _ in range(num_samples):
             i, j = 0, 0
             
             while i == j: 
-                i = np.random.randint(self.H.num_edges)
-                j = np.random.randint(self.H.num_edges)
+                i = random_nums[current_random_num, 0]
+                j = random_nums[current_random_num, 1]
+                current_random_num += 1
             
             e = self.H.edges.members(i)
             f = self.H.edges.members(j)
@@ -149,9 +187,36 @@ class GrowingHypergraph:
             k = len(e.intersection(f))
             
             C[len(e), len(f), k] += 1
-            C[len(f), len(e), k] += 1
+        
+        C = C + np.transpose(C, (1, 0, 2))
+        
+        if normalize: 
+            C = C / C.sum(axis = 2, keepdims = True)
             
-        return C / (2*num_samples)
+        return C
+    
+    # def intersection_array(self, normalize = False, sample = None):
+        
+    #     k_max = self.edge_size_sequence().max()
+    #     eids = list(self.H.edges)
+    #     m_edges = len(eids)
+    #     P = np.zeros((k_max+1, k_max+1, k_max+1))
+        
+    #     if not sample: 
+    #         for eid in eids:
+    #             e   = self.H.edges.members(eid)
+    #             de = self.edge_neighborhood(eid, as_node_sets = True)
+    #             for e_ in de: 
+    #                 k = len(e.intersection(e_))
+    #                 P[len(e), len(e_), k] += 1
+
+        
+    #     if normalize: 
+    #         P = P / P.sum(axis = (1, 2), keepdims = True)
+    #         # P[np.isnan(P)] = 0
+    #     return P 
+                
+        
     
     def intersection_profile(self, randomize = False, interval = 1):
         
