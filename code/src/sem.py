@@ -5,6 +5,7 @@ import scipy.special as ss
 # import likelihoods
 from . import likelihoods
 
+# +
 class SEM:
     
     def __init__(self, H, pars = None):
@@ -39,8 +40,9 @@ class SEM:
         # This happened for Math-geology possibly due to the fact that somebody publish paper by themselves, which is natural
         
         
+#         eid = min_time
         
-        while True: 
+        while True:
             eid = np.random.randint(min_time, self.H.num_edges)
             e   = self.H.edges.members(eid)
             
@@ -48,6 +50,7 @@ class SEM:
             de  = self.H.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
             if len(de) > 0 : 
                 break
+            eid += 1
                 
         #print(e, de)
         
@@ -85,12 +88,15 @@ class SEM:
             k = len(e.intersection(e_))
             
             # vector of sufficient statistics
-            s = np.array([k, j - k, i - k - l, l])
+            s = np.array([k, i - k, i - k - l, l])
             
             # now we need to weight s by the joint likelihood of e and e_
             
             # guaranteed model for sampling nodes from e_
-            p1 = (self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
+            if k != 0:
+                p1 = (k/i)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
+            else:
+                p1 = 0.
             
             # addition of novel nodes
             p2 = poisson(l, self.pars["beta"])
@@ -120,7 +126,7 @@ class SEM:
         
         return S
         
-    def SEM_step(self, rho, **kwargs):
+    def SEM_step(self, rho,  **kwargs):
         """
         this is the function in which we could implement variance-reducing stochastic EM as in that paper. 
         """
@@ -137,6 +143,8 @@ class SEM:
         # technically it's an optimization problem, but we can again do it in closed form
         if (S[0] + S[1]-1) !=0 : 
             eta_update = (S[0]-1)/(S[0] + S[1] - 1)
+#             eta_update = (S[0])/(S[0] + S[1] - 1)
+            
         else:
             #print("here")
             eta_update = self.pars["eta"]
@@ -148,7 +156,7 @@ class SEM:
         
         
         # now we average the current estimates with the new ones
-        self.pars["eta"]   = (1-rho)*self.pars["eta"]   + rho*eta_update
+        self.pars["eta"]   =  self.pars["eta"] * (1 - rho) + rho *eta_update
         self.pars["gamma"] = (1-rho)*self.pars["gamma"] + rho*gamma_update
         self.pars["beta"]  = (1-rho)*self.pars["beta"]  + rho*beta_update
         
@@ -200,7 +208,7 @@ class SEM:
             k = len(e.intersection(e_))
             
 
-            p1 = (pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
+            p1 =  (k/j)*(pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
             
             # addition of novel nodes
             p2 = poisson(l, pars["beta"])
@@ -216,6 +224,9 @@ class SEM:
         proba = P/count
         
         return proba 
+
+
+# -
 
 def poisson(x, lam):
     return np.exp(-lam)*(lam**(x))/ss.factorial(x)
