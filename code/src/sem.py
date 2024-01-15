@@ -94,7 +94,7 @@ class SEM:
             
             # guaranteed model for sampling nodes from e_
             if k != 0:
-                p1 = (k/i)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
+                p1 = (k/j)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
             else:
                 p1 = 0.
             
@@ -208,7 +208,7 @@ class SEM:
             k = len(e.intersection(e_))
             
 
-            p1 =  (k/j)*(pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
+            p1 =  (k/i)*(pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
             
             # addition of novel nodes
             p2 = poisson(l, pars["beta"])
