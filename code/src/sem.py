@@ -75,7 +75,7 @@ class SEM:
         i = len(e)
         
         # vector of sufficient statistics
-        S = np.zeros(4)
+        S = np.zeros(4) 
         
         # this is going to be the marginal likelihood of e
         P = 0 
@@ -88,15 +88,17 @@ class SEM:
             k = len(e.intersection(e_))
             
             # vector of sufficient statistics
-            s = np.array([k, i - k, i - k - l, l])
+            s = np.array([k, j - k, i - k - l, l])
             
             # now we need to weight s by the joint likelihood of e and e_
             
             # guaranteed model for sampling nodes from e_
-            if k != 0:
-                p1 = (k/j)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
-            else:
-                p1 = 0.
+            # this is the probability of realizing a given 
+            # intersection of e and e_ conditional on its size k and the size 
+            # j of e_
+            
+            p1 = (k/j)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
+            
             
             # addition of novel nodes
             p2 = poisson(l, self.pars["beta"])
@@ -141,12 +143,10 @@ class SEM:
         
         # this is the stochastic M step
         # technically it's an optimization problem, but we can again do it in closed form
-        if (S[0] + S[1]-1) !=0 : 
+        if (S[0] + S[1] - 1) !=0 : 
             eta_update = (S[0]-1)/(S[0] + S[1] - 1)
-#             eta_update = (S[0])/(S[0] + S[1] - 1)
             
         else:
-            #print("here")
             eta_update = self.pars["eta"]
         
         gamma_update = S[2]
@@ -156,9 +156,9 @@ class SEM:
         
         
         # now we average the current estimates with the new ones
-        self.pars["eta"]   =  self.pars["eta"] * (1 - rho) + rho *eta_update
-        self.pars["gamma"] = (1-rho)*self.pars["gamma"] + rho*gamma_update
-        self.pars["beta"]  = (1-rho)*self.pars["beta"]  + rho*beta_update
+        self.pars["eta"]   = (1 - rho)*self.pars["eta"]   + rho *eta_update
+        self.pars["gamma"] = (1 - rho)*self.pars["gamma"] + rho*gamma_update
+        self.pars["beta"]  = (1 - rho)*self.pars["beta"]  + rho*beta_update
         
         
     def predict(self, H0, e, pars, min_time = 0):
