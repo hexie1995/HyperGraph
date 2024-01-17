@@ -27,6 +27,7 @@ class SEM:
     
         self.memoize = memoize
         
+        self.S = np.array([1, 2, 1, 1]) # we are going to maintain a moving average of the sufficient stats instead of the pars
         self.cache_likelihoods()
         
     def cache_likelihoods(self): 
@@ -109,25 +110,20 @@ class SEM:
         this is the function in which we could implement variance-reducing stochastic EM as in that paper. 
         """
         
-        # Xie: One of the main thing we could focus on revising here is the step size rho
-        # according to the original paper and some research, the convergence of SEM is largely dependent on rho.
-        
-        
-        
         # technically, this is the stochastic E step
-        S = self.SE_step(**kwargs)
+        
+        S_ = self.SE_step(**kwargs)
+        
+        # update the vector of sufficient stats
+        self.S = (1-rho)*self.S + rho*(S_)
         
         # this is the stochastic M step
         # technically it's an optimization problem, but we can again do it in closed form
-        eta_update = (S[0] - 1)/(S[0] + S[1] - 1)
-        gamma_update = S[2]
-        beta_update  = S[3] 
         
-        # now we average the current estimates with the new ones
-        self.pars["eta"]   = (1 - rho)*self.pars["eta"]   + rho *eta_update
-        self.pars["gamma"] = (1 - rho)*self.pars["gamma"] + rho*gamma_update
-        self.pars["beta"]  = (1 - rho)*self.pars["beta"]  + rho*beta_update
-        
+        self.pars["eta"] = (self.S[0] - 1)/(self.S[0] + self.S[1] - 1)
+        self.pars["gamma"] = self.S[2] 
+        self.pars["beta"]  = self.S[3] 
+    
         self.cache_likelihoods()
         
     def predict(self, H0, e, pars, min_time = 0):
