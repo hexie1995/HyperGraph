@@ -61,6 +61,10 @@ class NodesFromHypergraphLikelihood(Likelihood):
 # m_step estimators are the parameter estimators for each distribution
 # used in m-step, using the matrix chi formed in the E-step
 
+def poisson(x, lam):
+    return np.exp(-lam)*(lam**(x))/ss.factorial(x)
+
+
 # edge sampling
 def edge_sample_pmf(x, t, eta):
     return (eta**x)*((1-eta)**(t-x))
@@ -76,9 +80,11 @@ esl = EdgeSampleLikelihood(
 
 # edge sampling: guaranteed version
 def guaranteed_edge_sample_pmf(x, t, eta):
-    M = (eta**(x-1))*((1-eta)**(t-x)) # ?
-    M[x == 0] = 0
-    M[t < x] = 0
+    M = x/t*(eta**(x-1))*((1-eta)**(t-x)) # ?
+    
+    if isinstance(x, np.ndarray):
+        M[x == 0] = 0
+        M[t < x] = 0
     return M
 
 def guaranteed_edge_sample_m_step(x, t, chi):
@@ -87,15 +93,16 @@ def guaranteed_edge_sample_m_step(x, t, chi):
     bottom = ((t-1)*C).sum()
     return top / bottom
 
-edge_sample_likelihood = EdgeSampleLikelihood(
+guaranteed_edge_sample_likelihood = EdgeSampleLikelihood(
     pmf = guaranteed_edge_sample_pmf, 
     m_step = guaranteed_edge_sample_m_step
     )
 
 # addition of novel nodes not previously seen in the hypergraph
 def novel_nodes_pmf(x, beta):
-    P = (beta**x)*np.exp(-beta)/(ss.factorial(x))
-    P[x < 0] = 0
+    P = poisson(x, beta)
+    if isinstance(x, np.ndarray):
+        P[x < 0] = 0
     return P
 
 def novel_nodes_m_step(k, chi):
@@ -105,8 +112,9 @@ novel_nodes_likelihood = NovelNodesLikelihood(pmf = novel_nodes_pmf, m_step = no
 
 # addition of nodes from rest of hypergraph
 def nodes_from_hypergraph_pmf(x, gamma):
-    M = (gamma**x)*np.exp(-gamma)/(ss.factorial(x))
-    M[x < 0] = 0
+    M = poisson(x, gamma)
+    if isinstance(x, np.ndarray):
+        M[x < 0] = 0
     return M
 
 def nodes_from_hypergraph_m_step(x, chi):

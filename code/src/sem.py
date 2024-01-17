@@ -2,14 +2,13 @@ import xgi
 import numpy as np
 import math
 import scipy.special as ss
-# import likelihoods
-from . import likelihoods
+import functools
 
-# +
+
 class SEM:
     
-    def __init__(self, H, pars = None):
-        
+    def __init__(self, H, edge_sample_likelihood, nodes_from_hypergraph_likelihood, novel_nodes_likelihood, pars = None, memoize = False):
+
         self.ll_history = []
         
         if not pars: 
@@ -22,112 +21,87 @@ class SEM:
         # at the time a given edge was formed. 
         self.new_node_sequence = self.H.new_node_sequence()
         
-    def SE_step(self, min_time = 0):
-        """
-        this function is a great place for performance improvements: better use of numpy, more efficient hypergraph queries, memoization, etc. 
-        """
+        self.esl = edge_sample_likelihood
+        self.nfl = nodes_from_hypergraph_likelihood
+        self.nnl = novel_nodes_likelihood
         
-
-        # pick a random edge of H
-        # it is required that this random edge overlap with some edges
-        # that were previous to it
-        # otherwise, we assume that the edge was a "root" edge and irrelevant for inference
+        self.memoize = memoize
         
-        
-        # Note very importantly, this new neighborhood de could not be the same as e, 
-        # Because if so then there's a high possibility that the only edge overlapping with it is itself
-        # When situation like this happens you enter an eternal loop and you fail. 
-        # This happened for Math-geology possibly due to the fact that somebody publish paper by themselves, which is natural
-        
-        
-#         eid = min_time
-        
-        while True:
+    def sample_edge_with_neighborhood(self, min_time = 0, require_neighbors = True):
+        while True: 
             eid = np.random.randint(min_time, self.H.num_edges)
             e   = self.H.edges.members(eid)
             
             # set of all edges that overlap e and arrived before e
             de  = self.H.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
-            if len(de) > 0 : 
+            
+            if not require_neighbors:
                 break
-            eid += 1
-                
-        #print(e, de)
+            else:
+                if len(de) > 0 : 
+                    break
         
-        # now we need to compute the expected sufficient statistics, taking an expectation across all the edges e_ that 
-        # overlap e and arrived before e. 
+        return e, eid, de 
+    
+    def expected_sufficient_statistics(self, e, eid, de):
         
-        # Let:
-        # - k be the size of the intersection e and e_
-        # - i be the size of e
-        # - j be the size of e_
-        # - l be the number of novel nodes in e
+        # memoization can lead to speed improvements
         
-        # Then, the sufficient statistics are: 
-        # - The intersection size k
-        # - The number of nodes in e_ not added to e (j - k)
-        # - The number of novel nodes l
-        # - The number of existing nodes added from the hypergraph, which is i - k - l. 
+        if self.memoize: 
+            esl = functools.cache(lambda k, j: self.esl(k, j, eta = self.pars["eta"]))
+            nfl = functools.cache(lambda h: self.nfl(h, gamma = self.pars["gamma"]))
+            nnl = functools.cache(lambda l: self.nnl(l, beta = self.pars["beta"]))
+            
+        else: 
+            esl = lambda k, j: self.esl(k, j, eta = self.pars["eta"])
+            nfl = lambda h: self.nfl(h, gamma = self.pars["gamma"])
+            nnl = lambda l: self.nfl(l, beta = self.pars["beta"])
+                    
+        S = np.zeros(4) 
+        P = 0 
         
-        
-        # these two can be calculated without looping over de
         l = len([i for i in e if i > self.new_node_sequence[eid-1]])
         i = len(e)
         
-        # vector of sufficient statistics
-        S = np.zeros(4) 
-        
-        # this is going to be the marginal likelihood of e
-        P = 0 
-        
-        # loop over de to compute the expectations we need
         for e_ in de: 
-            
-            # properties of e_ 
             j = len(e_)
             k = len(e.intersection(e_))
             
             # vector of sufficient statistics
             s = np.array([k, j - k, i - k - l, l])
+
+            # compute the likelihood of the vector of sufficient statistics
+            p1 = esl(k, j)
             
-            # now we need to weight s by the joint likelihood of e and e_
+            p2 = nfl(i - k - l)
+            p3 = nnl(l)
+
+            # this is sus -- I think actually this should be the likelihood in batch EM as well. 
+            p2 /= (ss.binom(self.new_node_sequence[eid-1], i - k - l))  
             
-            # guaranteed model for sampling nodes from e_
-            # this is the probability of realizing a given 
-            # intersection of e and e_ conditional on its size k and the size 
-            # j of e_
-            
-            p1 = (k/j)*(self.pars["eta"]**(k - 1.0))*((1.0 - self.pars["eta"])**(j - k))
-            
-            
-            # addition of novel nodes
-            p2 = poisson(l, self.pars["beta"])
-            
-            # addition of nodes from the remainder of the hypergraph (approximation when the number of nodes is large)
-            p3 = poisson(i - k - l, self.pars["gamma"])/(ss.binom(self.new_node_sequence[eid-1], i - k - l))
-            
-            # add to s
             p  = p1*p2*p3
             S += p*s
             P += p
             
-            #print(np.array([i, j, k]), e, e_)
-        
-        
-        # dividing by P means that S is the *conditional* distribution over e_ given e, which is what we want. 
-        
-        #print("old S")
-        #print(S)
-        
         S /= P
         
-        #print("S")
-        #print(S)
-        #print("P")
-        #print(P)
-        
         return S
+    
+    def SE_step(self, min_time = 0, batch_size = 1):
+        """
+        this function is a great place for performance improvements: better use of numpy, more efficient hypergraph queries, memoization, etc. 
+        """
         
+        mean_S = np.zeros(4)    
+        for _ in range(batch_size):
+            e, eid, de = self.sample_edge_with_neighborhood(min_time, True)
+            S          = self.expected_sufficient_statistics(e, eid, de)
+        
+            mean_S += S
+        
+        mean_S /= batch_size
+        return mean_S
+
     def SEM_step(self, rho,  **kwargs):
         """
         this is the function in which we could implement variance-reducing stochastic EM as in that paper. 
@@ -143,17 +117,9 @@ class SEM:
         
         # this is the stochastic M step
         # technically it's an optimization problem, but we can again do it in closed form
-        if (S[0] + S[1] - 1) !=0 : 
-            eta_update = (S[0]-1)/(S[0] + S[1] - 1)
-            
-        else:
-            eta_update = self.pars["eta"]
-        
+        eta_update = (S[0] - 1)/(S[0] + S[1] - 1)
         gamma_update = S[2]
-        beta_update = S[3] 
-        
-        
-        
+        beta_update  = S[3] 
         
         # now we average the current estimates with the new ones
         self.pars["eta"]   = (1 - rho)*self.pars["eta"]   + rho *eta_update
