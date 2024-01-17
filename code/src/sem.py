@@ -21,11 +21,25 @@ class SEM:
         # at the time a given edge was formed. 
         self.new_node_sequence = self.H.new_node_sequence()
         
-        self.esl = edge_sample_likelihood
-        self.nfl = nodes_from_hypergraph_likelihood
-        self.nnl = novel_nodes_likelihood
-        
+        self.esl_base = edge_sample_likelihood
+        self.nfl_base = nodes_from_hypergraph_likelihood
+        self.nnl_base = novel_nodes_likelihood
+    
         self.memoize = memoize
+        
+        self.cache_likelihoods()
+        
+    def cache_likelihoods(self): 
+        
+        if self.memoize: 
+            self.esl = functools.cache(lambda k, j: self.esl_base(k, j, eta = self.pars["eta"]))
+            self.nfl = functools.cache(lambda h: self.nfl_base(h, gamma = self.pars["gamma"]))
+            self.nnl = functools.cache(lambda l: self.nnl_base(l, beta = self.pars["beta"]))
+            
+        else: 
+            self.esl = lambda k, j: self.esl_base(k, j, eta = self.pars["eta"])
+            self.nfl = lambda h: self.nfl_base(h, gamma = self.pars["gamma"])
+            self.nnl = lambda l: self.nnl_base(l, beta = self.pars["beta"])
         
     def sample_edge_with_neighborhood(self, min_time = 0, require_neighbors = True):
         while True: 
@@ -44,19 +58,7 @@ class SEM:
         return e, eid, de 
     
     def expected_sufficient_statistics(self, e, eid, de):
-        
-        # memoization can lead to speed improvements
-        
-        if self.memoize: 
-            esl = functools.cache(lambda k, j: self.esl(k, j, eta = self.pars["eta"]))
-            nfl = functools.cache(lambda h: self.nfl(h, gamma = self.pars["gamma"]))
-            nnl = functools.cache(lambda l: self.nnl(l, beta = self.pars["beta"]))
-            
-        else: 
-            esl = lambda k, j: self.esl(k, j, eta = self.pars["eta"])
-            nfl = lambda h: self.nfl(h, gamma = self.pars["gamma"])
-            nnl = lambda l: self.nfl(l, beta = self.pars["beta"])
-                    
+                      
         S = np.zeros(4) 
         P = 0 
         
@@ -71,10 +73,10 @@ class SEM:
             s = np.array([k, j - k, i - k - l, l])
 
             # compute the likelihood of the vector of sufficient statistics
-            p1 = esl(k, j)
+            p1 = self.esl(k, j)
             
-            p2 = nfl(i - k - l)
-            p3 = nnl(l)
+            p2 = self.nfl(i - k - l)
+            p3 = self.nnl(l)
 
             # this is sus -- I think actually this should be the likelihood in batch EM as well. 
             p2 /= (ss.binom(self.new_node_sequence[eid-1], i - k - l))  
@@ -126,6 +128,7 @@ class SEM:
         self.pars["gamma"] = (1 - rho)*self.pars["gamma"] + rho*gamma_update
         self.pars["beta"]  = (1 - rho)*self.pars["beta"]  + rho*beta_update
         
+        self.cache_likelihoods()
         
     def predict(self, H0, e, pars, min_time = 0):
         """
