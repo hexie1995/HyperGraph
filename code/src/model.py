@@ -10,7 +10,7 @@ class GrowingHypergraph:
         Unclear what we want track_branching for, but it might be interesting for things like community detection or visualization. 
         """
         if H:
-            H = xgi.classes.function.convert_labels_to_integers(H)
+            H = xgi.utils.utilities.convert_labels_to_integers(H)
             self.H = H
         else:
             self.H = xgi.Hypergraph()
@@ -293,6 +293,6 @@ class GrowingHypergraph:
                 n_max = i_max
             timesteps[eid] = n_max
         return timesteps
+
         
-        
-        
+
