@@ -1,0 +1,93 @@
+# +
+# %load_ext autoreload
+# %autoreload 2
+
+import importlib 
+m = importlib.import_module(".model", "src")
+sem = importlib.import_module(".sem", "src") # my implementation of baby SEM
+em = importlib.import_module(".em", "src")
+ll = importlib.import_module(".likelihoods", "src")
+from matplotlib import pyplot as plt
+import numpy as np
+from multiprocessing import Pool
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
+import xgi
+import copy
+import random
+import statistics
+import matplotlib.pyplot as plt
+import scipy.special as ss
+import json
+
+
+init_pars = {"eta"   : 0.3, 
+             "beta"  : 0.7, 
+             "gamma" : 0.1}
+
+
+
+# track the parameter estimates over time
+
+def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
+    
+    if not ax: 
+        fig, ax = plt.subplots(1, 1)
+        
+    EM = sem.SEM(H, 
+             ll.guaranteed_edge_sample_likelihood,
+             ll.nodes_from_hypergraph_likelihood,
+             ll.novel_nodes_likelihood,
+             pars = init_pars.copy(), 
+             memoize = True)
+    
+    epochs = int(steps / batch_size)
+    
+    ETA   = np.zeros(epochs)
+    BETA  = np.zeros(epochs)
+    GAMMA = np.zeros(epochs)
+
+    # main loop
+    for i in range(epochs):
+
+        if i % max(int(epochs/20), 1) == 0 and verbose:
+            print("--------")
+            print(f"Completed epoch {i}")
+            print(EM.pars)
+            
+        EM.SEM_step(0.002*batch_size, batch_size = batch_size) # both the stochastic E and the M steps are in here
+        ETA[i] = EM.pars["eta"]
+        BETA[i] = EM.pars["beta"]
+        GAMMA[i] = EM.pars["gamma"]
+    
+    
+    return ETA, BETA, GAMMA
+    
+    
+    
+def run_real_world(data_name):
+    
+    H0 = xgi.load_xgi_data(data_name)
+    H0 = m.GrowingHypergraph(H0)
+    ETA, BETA, GAMMA = experiment(H0)
+    
+    pars = {"dataset": data_name, "eta": np.mean(ETA),  "beta": np.mean(BETA),  "gamma": np.mean(GAMMA)}
+    
+    with open('results/res_{}.json'.format(data_name + "_SEM"), 'w') as fp:
+        json.dump(pars, fp)
+    
+
+
+
+#small_realworld_Hgraphs = ["email-enron", "diseasome", "hospital-lyon"]
+
+realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", "congress-bills", "contact-high-school", 
+                 "contact-primary-school", "dawn", "diseasome","disgenenet", "email-enron", "email-eu", "hospital-lyon",
+                 "hypertext-conference", "invs13", "invs15", "kaggle-whats-cooking", "malawi-village", "ndc-classes",
+                 "ndc-substances", "science-gallery", "sfhh-conference","tags-ask-ubuntu", "tags-math-sx" , 
+                 "tags-stack-overflow", "threads-ask-ubuntu", "threads-math-sx", "threads-stack-overflow"]
+
+
+#run_real_world("email-enron")
+
+with Pool(len(realworld_Hgraphs)) as p:
+    print(p.map(run_real_world, realworld_Hgraphs))
