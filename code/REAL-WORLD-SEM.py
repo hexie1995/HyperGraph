@@ -18,7 +18,8 @@ import statistics
 import matplotlib.pyplot as plt
 import scipy.special as ss
 import json
-
+import os
+import pickle
 
 init_pars = {"eta"   : 0.3, 
              "beta"  : 0.7, 
@@ -30,8 +31,8 @@ init_pars = {"eta"   : 0.3,
 
 def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
     
-    if not ax: 
-        fig, ax = plt.subplots(1, 1)
+    #if not ax: 
+    #    fig, ax = plt.subplots(1, 1)
         
     EM = sem.SEM(H, 
              ll.guaranteed_edge_sample_likelihood,
@@ -76,9 +77,23 @@ def run_real_world(data_name):
         json.dump(pars, fp)
     
 
+def run_bench_mark(data_name):
+    
+    Dir = r"../data//"
+    with open(os.path.join(Dir, data_name + '_pos.pkl'), 'rb') as h: pos_edges = pickle.load(h)
+        
+    H0 = xgi.Hypergraph(pos_edges)
+    H0 = m.GrowingHypergraph(H0)
+    ETA, BETA, GAMMA = experiment(H0)
+    
+    pars = {"dataset": data_name, "eta": np.mean(ETA),  "beta": np.mean(BETA),  "gamma": np.mean(GAMMA)}
+    
+    with open('results/res_{}.json'.format(data_name + "_SEM"), 'w') as fp:
+        json.dump(pars, fp)
+    
 
 
-#small_realworld_Hgraphs = ["email-enron", "diseasome", "hospital-lyon"]
+bench_mark = ["iAF1260b", "iJO1366", "uspto"]
 
 realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", "congress-bills", "contact-high-school", 
                  "contact-primary-school", "dawn", "diseasome","disgenenet", "email-enron", "email-eu", "hospital-lyon",
@@ -86,8 +101,14 @@ realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", 
                  "ndc-substances", "science-gallery", "sfhh-conference","tags-ask-ubuntu", "tags-math-sx" , 
                  "tags-stack-overflow", "threads-ask-ubuntu", "threads-math-sx", "threads-stack-overflow"]
 
-
+# IF YOU WANT TO ONLY RUN ONE DATASET
 #run_real_world("email-enron")
 
-with Pool(len(realworld_Hgraphs)) as p:
-    print(p.map(run_real_world, realworld_Hgraphs))
+# IF YOU WANT TO RUN ALL XGI DATASET IN PARALLEL
+#with Pool(len(realworld_Hgraphs)) as p:
+#    print(p.map(run_real_world, realworld_Hgraphs))
+# -
+
+# IF YOU WANT TO RUN THE BENCHMARKING DATASET
+for data_ in bench_mark:
+    run_bench_mark(data_)
