@@ -28,7 +28,7 @@ class SEM_vr:
         # used to count the iterations this item has go through, update the meanvalue every 100 times.
         self.inner_count = 0
         
-        
+    
         # needed to keep track of which nodes were present in the hypergraph 
         # at the time a given edge was formed. 
         self.new_node_sequence = self.H.new_node_sequence()
@@ -121,7 +121,7 @@ class SEM_vr:
         
         # this is the stochastic M step
         # technically it's an optimization problem, but we can again do it in closed form
-        eta_update = (S[0]-1)/(S[0] + S[1]-1)
+        eta_update = (S[0] - 1)/(S[0] + S[1] - 1)
         gamma_update = S[2]
         beta_update = S[3]
         
@@ -130,7 +130,7 @@ class SEM_vr:
         self.GAMMA.append(gamma_update)
         
         #  this number should change based on what we think a "batch" is. 
-        if self.inner_count %100 ==0 : 
+        if self.inner_count % 100 ==0 : 
             
             i = self.inner_count
             
@@ -138,7 +138,7 @@ class SEM_vr:
             self.initial_beta = beta_update
             self.initial_gamma = gamma_update
             
-            if self.inner_count ==0:
+            if self.inner_count == 0:
                 self.mean_eta = np.mean(self.ETA[i])
                 self.mean_beta = np.mean(self.BETA[i])
                 self.mean_gamma = np.mean(self.GAMMA[i])        
