@@ -54,13 +54,22 @@ class GrowingHypergraph:
                 if np.random.rand() < eta:
                     e_.add(i)
             
+            
+            # DIFFERENCES
             # then, add unrelated nodes from graph
             num_left   = self.H.num_nodes - len(e)
-            num_to_add = np.random.binomial(num_left, gamma/self.H.num_nodes)
+            num_to_add1 = np.random.choice(len(gamma), 1, p = gamma)[0]
+            #print(num_to_add)
+            #num_to_add = np.random.binomial(num_left, gamma/self.H.num_nodes)
             
             num_added = 0
             
-            while num_added < num_to_add: 
+            if num_left < num_to_add1:
+                num_to_add1 = num_left
+            
+            
+            
+            while num_added < num_to_add1 and num_to_add1 != 0: 
                 candidate = np.random.randint(0, self.H.num_nodes)
                 # candidate = np.random.choice(self.H.nodes, 1)[0]
                 if candidate not in e:
@@ -266,13 +275,19 @@ class GrowingHypergraph:
         """
         """
         
+        
         e = self.H.edges.members(eid)
+        set0 = set(e)
         neighbor_edges = []
+        
+        
+        
         for i in e: 
             for eid_ in self.H.nodes.memberships(i):
                 if ((not prior_only) or (eid_ <= eid)) and (eid_ != eid): 
                     neighbor_edges.append(eid_)
-                    
+
+        
         neighbor_edges = set(neighbor_edges)
         if as_node_sets: 
             return [self.H.edges.members(eid_) for eid_ in neighbor_edges]
