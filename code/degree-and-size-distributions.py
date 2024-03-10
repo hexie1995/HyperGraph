@@ -4,33 +4,62 @@ import seaborn as sns
 import numpy as np
 import os 
 import pandas as pd
+import pickle
 from itertools import product
 from scipy.special import binom
+from multiprocessing import Pool
 
-os.chdir("code")
 import importlib 
 m = importlib.import_module(".model", "src")
-em = importlib.import_module(".em", "src")
-sem = importlib.import_module(".sem", "src") 
 ll = importlib.import_module(".likelihoods", "src") 
-os.chdir("..")
 
+# ## PREP
 
-
-
-
-
-### PREP
-
+# +
 plt.style.use('seaborn-v0_8-whitegrid')
 os.makedirs("code/figures/moments",exist_ok = True)
 
-### Plot Functions
 
-def read_pars(path = "code/figures/parameters.csv"):
+realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history",
+                     "diseasome", "kaggle-whats-cooking", "ndc-classes", "ndc-substances",
+                     "tags-ask-ubuntu", "tags-math-sx" , "tags-stack-overflow", "threads-ask-ubuntu", 
+                     "threads-math-sx", "threads-stack-overflow",
+                     "congress-bills", "contact-high-school", "contact-primary-school",
+                     "email-enron", "email-eu", "hospital-lyon", "hypertext-conference", 
+                     "invs13", "invs15",  "malawi-village", "science-gallery", "sfhh-conference"]
+
+
+# -
+
+# ## Plot Functions
+
+# +
+def expectation(x):
+    
+    to_sum = [(i)*j for i,j in enumerate(x)]
+      
+    return sum(to_sum)
+
+def read_pars(path = "figures/parameters.csv"):
     return pd.read_csv(path).set_index("dataset")
 
-pars = read_pars().to_dict(orient = "index")
+# +
+pars = {}
+for data_name in realworld_Hgraphs:
+    pars[data_name] = {}
+    with open('sem_results/res_{}.pkl'.format(data_name + "_SEM_new"), "rb") as f:
+        d = pickle.load(f)
+
+    pars[data_name]["eta"] = np.mean(d["eta"][-50:])
+    pars[data_name]["beta"] = np.mean(d["beta"][-50:])   
+    pars[data_name]["gamma"] = expectation(np.mean(d["gamma"][-50:], axis=0))
+    pars[data_name]["gamma_vec"] = np.mean(d["gamma"], axis=0)
+
+
+#pars = read_pars().to_dict(orient = "index")
+
+
+# -
 
 def prepare_figure(data_name):
     fig, ax = plt.subplots(1, 2, figsize = (8, 4))
@@ -63,8 +92,8 @@ def degree_histogram(H, par, ax):
     dmax = d.max()
     dmin = d.min()
     
-    upper = dmax / 3
-    lower = dmax / 30
+    upper = dmax / 5
+    lower = dmax / 50
     
     x = np.linspace(max(100, lower), upper, 10)
     
@@ -74,14 +103,14 @@ def degree_histogram(H, par, ax):
     y = y / y.sum()
     
     ax.plot(x, y, linestyle = "--", color = "black")
-    
+
     
 
 def edge_size_histogram(H, par, ax):
     
     k = H.edge_size_sequence()
 
-    hist, bins = np.histogram(k, bins = min(int(len(k)/10), 30))
+    hist, bins = np.histogram(k, bins = min(int(len(k)/10), 50))
     p = hist / hist.sum()
     ax.semilogy()
     ax.scatter(bins[:-1], p)
@@ -108,9 +137,9 @@ def make_fig(data_name):
     edge_size_histogram(H, par,ax[1])
 
     plt.tight_layout()
-    plt.savefig(f"code/figures/moments/{data_name}.png")
+    plt.savefig(f"figures/distributions/{data_name}.pdf")
 
-def edge_transition_matrix(par, k_max = 30):
+def edge_transition_matrix(par, k_max = 50):
     
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
 
@@ -128,7 +157,8 @@ def edge_transition_matrix(par, k_max = 30):
     # print(M)
     
     Pk = ll.poisson(K, beta)
-    Pl = ll.poisson(K, gamma)
+    #print("TEST, K", K)
+    Pl = ll.poisson(K, par["gamma_vec"][0:k_max+1])
     
     
     # entry S[i,j] should give the probability of realizing an edge of size j from an edge of size i
@@ -143,25 +173,41 @@ def edge_transition_matrix(par, k_max = 30):
             S[i, j+1] += M[i, h] * Pk[k] * Pl[l]
     
     return S[1:,1:]
-    
+
 def asymptotic_edge_size_distribution(*args, **kwargs):
     M = edge_transition_matrix(*args, **kwargs)
     eigs = np.linalg.eig(M.T)
     v = eigs[1][:,0]    
     v = v/v.sum()
     return v
+
+
+# +
+# for data_ in realworld_Hgraphs:
+#     try:
+#         make_fig(data_)
+#     except:
+#         print("not finished yet")
     
-
-
-
-
 # make_fig("email-enron")
 # make_fig("science-gallery")
-# make_fig("ndc-substances")
+
+make_fig("ndc-substances")
 # make_fig("tags-stack-overflow")
 # make_fig("email-eu")
-make_fig("hypertext-conference")
+# make_fig("hypertext-conference")
 # make_fig("contact-high-school")
 # make_fig("ndc-classes")
-# make_fig("kaggle-whats-cooking")
+# make_fig("invs13")
+# make_fig("invs15")
+# make_fig("sfhh-conference")
+# make_fig("contact-primary-school")
+# make_fig("diseasome")
+# make_fig("coauth-mag-geology")
+# make_fig("tags-ask-ubuntu")
+#make_fig("coauth-mag-history")
+
+#make_fig("kaggle-whats-cooking")
+# with Pool(len(realworld_Hgraphs)) as p:
+#      print(p.map(make_fig, realworld_Hgraphs))
 
