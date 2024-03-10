@@ -5,31 +5,23 @@ import random
 
 class GrowingHypergraph:
     
-    def __init__(self, H = None, track_branching = True, filter_singletons = False):
+    def __init__(self, H = None, track_branching = True):
         """
         Unclear what we want track_branching for, but it might be interesting for things like community detection or visualization. 
         """
-        if track_branching: 
-            self.track_branching = True
-            self.branches = dict()
         if H:
-            H = xgi.classes.function.convert_labels_to_integers(H)
-            if filter_singletons: 
-                self.H = xgi.Hypergraph()
-                sizes = H.edges.size.asnumpy()
-                for i in range(len(sizes)):
-                    if sizes[i] >= 2:
-                        self.H.add_edge(H.edges.members(i))
-            else:     
-                self.H = H
+            H = xgi.utils.utilities.convert_labels_to_integers(H)
+            self.H = H
         else:
             self.H = xgi.Hypergraph()
         
-        
-        self.nodes       = self.H.nodes    
-        self.num_nodes   = self.H.num_nodes
-        self.num_edges   = self.H.num_edges
-        self.edges       = self.H.edges
+        if track_branching: 
+            self.track_branching = True
+            self.branches = dict()
+        self.nodes = self.H.nodes    
+        self.num_nodes = self.H.num_nodes
+        self.num_edges = self.H.num_edges
+        self.edges = self.H.edges
         self._hypergraph = self.H._hypergraph 
         
         
@@ -62,13 +54,22 @@ class GrowingHypergraph:
                 if np.random.rand() < eta:
                     e_.add(i)
             
+            
+            # DIFFERENCES
             # then, add unrelated nodes from graph
             num_left   = self.H.num_nodes - len(e)
-            num_to_add = np.random.binomial(num_left, gamma/self.H.num_nodes)
+            num_to_add1 = np.random.choice(len(gamma), 1, p = gamma)[0]
+            #print(num_to_add)
+            #num_to_add = np.random.binomial(num_left, gamma/self.H.num_nodes)
             
             num_added = 0
             
-            while num_added < num_to_add: 
+            if num_left < num_to_add1:
+                num_to_add1 = num_left
+            
+            
+            
+            while num_added < num_to_add1 and num_to_add1 != 0: 
                 candidate = np.random.randint(0, self.H.num_nodes)
                 # candidate = np.random.choice(self.H.nodes, 1)[0]
                 if candidate not in e:
@@ -226,7 +227,7 @@ class GrowingHypergraph:
                 
         
     
-    def intersection_profile(self, randomize = False):
+    def intersection_profile(self, randomize = False, interval = 1):
         
         if randomize:
             GH = self.random_reindexed_hypergraph()
@@ -238,9 +239,9 @@ class GrowingHypergraph:
         eids = list(GH.H.edges)
         m_edges = len(eids)
         
-        timesteps = np.arange(1, m_edges)
+        timesteps = np.arange(1, m_edges // interval)*interval
         
-        for i in range(0, m_edges-1):
+        for i in range(0, m_edges // interval-1):
             eid = eids[timesteps[i]]
             e   = GH.H.edges.members(eid)
             de  = GH.edge_neighborhood(eid, prior_only = True, as_node_sets = True)
@@ -248,12 +249,11 @@ class GrowingHypergraph:
             for e_ in de: 
                 k = len(e.intersection(e_))
                 if k not in d: 
-                    d[k] = np.zeros(m_edges - 1)
+                    d[k] = np.zeros((m_edges // interval) - 1)
                 d[k][i] += 1
         
-        return d
-        # D = {k : np.cumsum(d[k]) / (((timesteps)**2)*2) for k in d}
-        # D = {k : np.cumsum(d[k])  for k in d}
+
+        D = {k : np.cumsum(d[k]) / (range(1, m_edges//interval)*(timesteps)) for k in d}
         
         # return d, timesteps
         return D, timesteps
@@ -275,13 +275,19 @@ class GrowingHypergraph:
         """
         """
         
+        
         e = self.H.edges.members(eid)
+        set0 = set(e)
         neighbor_edges = []
+        
+        
+        
         for i in e: 
             for eid_ in self.H.nodes.memberships(i):
                 if ((not prior_only) or (eid_ <= eid)) and (eid_ != eid): 
                     neighbor_edges.append(eid_)
-                    
+
+        
         neighbor_edges = set(neighbor_edges)
         if as_node_sets: 
             return [self.H.edges.members(eid_) for eid_ in neighbor_edges]
@@ -302,3 +308,6 @@ class GrowingHypergraph:
                 n_max = i_max
             timesteps[eid] = n_max
         return timesteps
+
+        
+
