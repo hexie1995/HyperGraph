@@ -158,7 +158,7 @@ def edge_transition_matrix(par, k_max = 50):
     
     Pk = ll.poisson(K, beta)
     #print("TEST, K", K)
-    Pl = ll.poisson(K, par["gamma_vec"][0:k_max+1])
+    Pl = par["gamma_vec"][0:k_max+1]
     
     
     # entry S[i,j] should give the probability of realizing an edge of size j from an edge of size i
@@ -189,10 +189,10 @@ def asymptotic_edge_size_distribution(*args, **kwargs):
 #     except:
 #         print("not finished yet")
     
-# make_fig("email-enron")
+make_fig("email-enron")
 # make_fig("science-gallery")
 
-make_fig("ndc-substances")
+# make_fig("ndc-substances")
 # make_fig("tags-stack-overflow")
 # make_fig("email-eu")
 # make_fig("hypertext-conference")
