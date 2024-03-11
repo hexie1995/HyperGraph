@@ -47,25 +47,24 @@ def read_pars(path = "figures/parameters.csv"):
 pars = {}
 for data_name in realworld_Hgraphs:
     pars[data_name] = {}
-    with open('sem_results/res_{}.pkl'.format(data_name + "_SEM_new"), "rb") as f:
+    with open('code/sem_results/res_{}.pkl'.format(data_name + "_SEM_new"), "rb") as f:
         d = pickle.load(f)
 
     pars[data_name]["eta"] = np.mean(d["eta"][-50:])
     pars[data_name]["beta"] = np.mean(d["beta"][-50:])   
     pars[data_name]["gamma"] = expectation(np.mean(d["gamma"][-50:], axis=0))
-    pars[data_name]["gamma_vec"] = np.mean(d["gamma"], axis=0)
+    pars[data_name]["gamma_vec"] = np.mean(d["gamma"][-50:], axis=0)
 
 
 #pars = read_pars().to_dict(orient = "index")
 
 
-# -
 
 def prepare_figure(data_name):
     fig, ax = plt.subplots(1, 2, figsize = (8, 4))
     par = pars[data_name]
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
-    fig.suptitle(fr"{data_name}:$\eta = ${eta}, $\beta = ${beta},$\gamma = ${gamma}")
+    fig.suptitle(fr"{data_name}:$\eta = ${eta:.3f}, $\beta = ${beta:.3f},$\gamma = ${gamma:.3f}")
     return fig, ax
 
 def prepare_data(data_name):
@@ -106,7 +105,7 @@ def degree_histogram(H, par, ax):
 
     
 
-def edge_size_histogram(H, par, ax):
+def edge_size_histogram(H, par, ax, k_max = 50):
     
     k = H.edge_size_sequence()
 
@@ -115,9 +114,9 @@ def edge_size_histogram(H, par, ax):
     ax.semilogy()
     ax.scatter(bins[:-1], p)
     ax.set(xlabel = "Edge Size", ylabel = None)
-    v = asymptotic_edge_size_distribution(par, k_max = k.max())
+    v = asymptotic_edge_size_distribution(par, k_max = k_max)
     ax.plot(np.arange(1, len(v)+1), v, color = "black")
-    ax.set(ylim = (p[p>0].min()/10, None))
+    ax.set(ylim = (p[p>0].min()/10, None), xlim = (1, k.max() + 2))
 
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
     
@@ -125,6 +124,7 @@ def edge_size_histogram(H, par, ax):
     modeled_mean_edge_size  = (v*np.arange(1, len(v)+1)).sum()
 
     ax.set(title = f"Mean edge size: {k.mean():.2f}\nModeled mean edge size: {modeled_mean_edge_size:.2f}\nAnalytic mean edge size: {analytic_mean_edge_size:.2f}")
+    
 
 def make_fig(data_name):
     fig, ax = prepare_figure(data_name)
@@ -132,16 +132,23 @@ def make_fig(data_name):
     par = pars[data_name]
 
     
-    
     degree_histogram(H, par,ax[0])
     edge_size_histogram(H, par,ax[1])
 
     plt.tight_layout()
-    plt.savefig(f"figures/distributions/{data_name}.pdf")
+    plt.savefig(f"code/figures/distributions/{data_name}.pdf")
 
 def edge_transition_matrix(par, k_max = 50):
     
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
+
+    GAMMA = np.zeros(k_max)
+    for i in range(par["gamma_vec"].shape[0]):
+        GAMMA[i] = par["gamma_vec"][i]
+
+    # = par["gamma_vec"]
+
+    # np.pad(par["gamma"], k_max - len(par["gamma"]))
 
     K = np.arange(0, k_max+1)
     X = K[None,:]
@@ -158,8 +165,7 @@ def edge_transition_matrix(par, k_max = 50):
     
     Pk = ll.poisson(K, beta)
     #print("TEST, K", K)
-    Pl = par["gamma_vec"][0:k_max+1]
-    
+    Pl = GAMMA[0:k_max+1]
     
     # entry S[i,j] should give the probability of realizing an edge of size j from an edge of size i
     
@@ -178,7 +184,7 @@ def asymptotic_edge_size_distribution(*args, **kwargs):
     M = edge_transition_matrix(*args, **kwargs)
     eigs = np.linalg.eig(M.T)
     v = eigs[1][:,0]    
-    v = v/v.sum()
+    v = np.real(v/v.sum())
     return v
 
 
@@ -190,17 +196,17 @@ def asymptotic_edge_size_distribution(*args, **kwargs):
 #         print("not finished yet")
     
 make_fig("email-enron")
-# make_fig("science-gallery")
+make_fig("science-gallery")
 
 # make_fig("ndc-substances")
 # make_fig("tags-stack-overflow")
-# make_fig("email-eu")
+make_fig("email-eu")
 # make_fig("hypertext-conference")
 # make_fig("contact-high-school")
 # make_fig("ndc-classes")
 # make_fig("invs13")
 # make_fig("invs15")
-# make_fig("sfhh-conference")
+make_fig("sfhh-conference")
 # make_fig("contact-primary-school")
 # make_fig("diseasome")
 # make_fig("coauth-mag-geology")

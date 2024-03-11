@@ -1,5 +1,7 @@
 
 	
+data-load: 
+	sbatch run-data-load-test.sh
 
 asymptotics: 
 	sbatch run-asymptotics.sh
