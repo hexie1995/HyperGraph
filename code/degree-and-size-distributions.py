@@ -43,35 +43,26 @@ def expectation(x):
 def read_pars(path = "figures/parameters.csv"):
     return pd.read_csv(path).set_index("dataset")
 
-# +
-pars = {}
-for data_name in realworld_Hgraphs:
-    pars[data_name] = {}
-    with open('code/sem_results/res_{}.pkl'.format(data_name + "_SEM_new"), "rb") as f:
-        d = pickle.load(f)
-
-    pars[data_name]["eta"] = np.mean(d["eta"][-50:])
-    pars[data_name]["beta"] = np.mean(d["beta"][-50:])   
-    pars[data_name]["gamma"] = expectation(np.mean(d["gamma"][-50:], axis=0))
-    pars[data_name]["gamma_vec"] = np.mean(d["gamma"][-50:], axis=0)
-
-
-#pars = read_pars().to_dict(orient = "index")
-
-
-
-def prepare_figure(data_name):
-    fig, ax = plt.subplots(1, 2, figsize = (8, 4))
-    par = pars[data_name]
-    eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
-    fig.suptitle(fr"{data_name}:$\eta = ${eta:.3f}, $\beta = ${beta:.3f},$\gamma = ${gamma:.3f}")
+def prepare_figure(data_names):
+    fig, ax = plt.subplots(2, len(data_names), figsize = (3.3*len(data_names), 6))
+    for i, data_name in enumerate(data_names):
+        # par = pars[data_name]
+        # eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
+        ax[0,i].set(title = data_name)
+        # fig.suptitle(fr"{data_name}:$\eta = ${eta:.3f}, $\beta = ${beta:.3f},$\gamma = ${gamma:.3f}")
     return fig, ax
 
-def prepare_data(data_name):
+def prepare_data(data_name, k_max = 50):
     H = xgi.load_xgi_data(data_name)
-    return m.GrowingHypergraph(H)
+    eids = list(H.edges)
+    H_ = xgi.Hypergraph()
+    for i in range(len(eids)):
+        if len(H.edges.members(eids[i])) <= k_max:
+            H_.add_edge(H.edges.members(eids[i]))
+    
+    return m.GrowingHypergraph(H_)
 
-def degree_histogram(H, par, ax):
+def degree_histogram(H, par, ax, label_y = True):
     d = H.degree_sequence()
 
     # probably need to do log binning in here or something. 
@@ -80,42 +71,46 @@ def degree_histogram(H, par, ax):
     hist, bins = np.histogram(d, bins = min(int(len(d)/5), 100))
     p = hist/hist.sum()
 
-    ax.scatter(bins[:-1], p)
+    ax.scatter(bins[:-1], p,  facecolors='none', edgecolors =  'cornflowerblue')
     ax.loglog()
     
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
     
     exponent = - (1 + 1 / eta)
-    ax.set(xlabel = "Degree", ylabel = "Density", title = f"Modeled exponent = {exponent:.2f}")
+    ax.set(xlabel = "Degree", xlim = (10, bins.max()*2))
+    # ax.set(title = f"Modeled exponent = {exponent:.2f}")
+    # ax.text
+    
+    if label_y:
+        ax.set(ylabel = "Density")
     
     dmax = d.max()
     dmin = d.min()
     
-    upper = dmax / 5
-    lower = dmax / 50
+    upper = dmax 
+    lower = dmax / 5
     
     x = np.linspace(max(100, lower), upper, 10)
     
-    y_upper = p.max()
     y = (x ** exponent) 
     
-    y = y / y.sum()
+    y = 3*y / y.sum()
     
-    ax.plot(x, y, linestyle = "--", color = "black")
+    ax.plot(x, y, linestyle = "--", color = "black", zorder = -10, linewidth=1)
 
+    ax.annotate(fr"$\zeta=${exponent:.2f}", xy = (x[0]*2, y[0]/2))
     
 
-def edge_size_histogram(H, par, ax, k_max = 50):
-    
+def edge_size_histogram(H, par, ax, k_max = 50, show_analytic = False):    
     k = H.edge_size_sequence()
 
     hist, bins = np.histogram(k, bins = min(int(len(k)/10), 50))
     p = hist / hist.sum()
     ax.semilogy()
-    ax.scatter(bins[:-1], p)
+    ax.scatter(bins[:-1], p, facecolors='none', edgecolors =  "sandybrown")
     ax.set(xlabel = "Edge Size", ylabel = None)
     v = asymptotic_edge_size_distribution(par, k_max = k_max)
-    ax.plot(np.arange(1, len(v)+1), v, color = "black")
+    ax.plot(np.arange(1, len(v)+1), v, color = "black", zorder = -10, linestyle = "--", linewidth=1)
     ax.set(ylim = (p[p>0].min()/10, None), xlim = (1, k.max() + 2))
 
     eta, beta, gamma = par["eta"], par["beta"], par["gamma"]
@@ -123,20 +118,58 @@ def edge_size_histogram(H, par, ax, k_max = 50):
     analytic_mean_edge_size = 1 + (gamma + beta) / (1 - eta)
     modeled_mean_edge_size  = (v*np.arange(1, len(v)+1)).sum()
 
-    ax.set(title = f"Mean edge size: {k.mean():.2f}\nModeled mean edge size: {modeled_mean_edge_size:.2f}\nAnalytic mean edge size: {analytic_mean_edge_size:.2f}")
+    title = f"Mean edge size: {k.mean():.2f}\nModeled mean edge size: {modeled_mean_edge_size:.2f}"
+    
+    if show_analytic: 
+        title += f"\nAnalytic mean edge size: {analytic_mean_edge_size:.2f}"
+    
+    ax.set(title = title)
     
 
-def make_fig(data_name):
-    fig, ax = prepare_figure(data_name)
-    H = prepare_data(data_name)
-    par = pars[data_name]
+def make_fig(data_names, fname = "multi"):
+    pars = {}
+    for data_name in data_names:
+        pars[data_name] = {}
+        with open('code/sem_results/res_{}.pkl'.format(data_name + "_SEM_new"), "rb") as f:
+            d = pickle.load(f)
 
+        pars[data_name]["eta"] = np.mean(d["eta"][-50:])
+        pars[data_name]["beta"] = np.mean(d["beta"][-50:])   
+        pars[data_name]["gamma"] = expectation(np.mean(d["gamma"][-50:], axis=0))
+        pars[data_name]["gamma_vec"] = np.mean(d["gamma"][-50:], axis=0)
     
-    degree_histogram(H, par,ax[0])
-    edge_size_histogram(H, par,ax[1])
+    
+    fig, ax = prepare_figure(data_names)
+    
+    all_y_max_upper = 0
+    all_y_min_upper = 1
+    all_y_max_lower = 0
+    all_y_min_lower = 1
+    
+    for i, data_name in enumerate(data_names):
+        
+        H = prepare_data(data_name)
+        par = pars[data_name]
 
+        degree_histogram(H, par,ax[0, i], label_y = (i == 0))
+        
+        k_max = 100 if data_name == "congress-bills" else 50
+        edge_size_histogram(H, par,ax[1, i], k_max = k_max)
+        
+        y_min_upper, y_max_upper = ax[0,i].get_ylim()
+        y_min_lower, y_max_lower = ax[1,i].get_ylim()
+        
+        all_y_min_upper = min(all_y_min_upper, y_min_upper)
+        all_y_min_lower = min(all_y_min_lower, y_min_lower)
+        all_y_max_upper = max(all_y_max_upper, y_max_upper)
+        all_y_max_lower = max(all_y_max_lower, y_max_lower)
+        
+    # for i in range(len(data_names)):
+    #     ax[0,i].set(ylim = (all_y_min_upper, all_y_max_upper))
+    #     ax[1,i].set(ylim = (all_y_min_lower, all_y_max_lower))
+        
     plt.tight_layout()
-    plt.savefig(f"code/figures/distributions/{data_name}.pdf")
+    plt.savefig(f"code/figures/distributions/{fname}.pdf")
 
 def edge_transition_matrix(par, k_max = 50):
     
@@ -183,7 +216,8 @@ def edge_transition_matrix(par, k_max = 50):
 def asymptotic_edge_size_distribution(*args, **kwargs):
     M = edge_transition_matrix(*args, **kwargs)
     eigs = np.linalg.eig(M.T)
-    v = eigs[1][:,0]    
+    i = np.argmax(np.real(eigs[0]))
+    v = eigs[1][:,i]    
     v = np.real(v/v.sum())
     return v
 
@@ -194,26 +228,35 @@ def asymptotic_edge_size_distribution(*args, **kwargs):
 #         make_fig(data_)
 #     except:
 #         print("not finished yet")
+
+make_fig([
+            "email-enron", 
+            "ndc-classes", 
+            "congress-bills", 
+            "tags-ask-ubuntu"
+        ], 
+        fname = "multi-distribution-fig")
+
     
-make_fig("email-enron")
-make_fig("science-gallery")
+# make_fig("email-enron")
+# make_fig("science-gallery")
 
-# make_fig("ndc-substances")
-# make_fig("tags-stack-overflow")
-make_fig("email-eu")
-# make_fig("hypertext-conference")
-# make_fig("contact-high-school")
-# make_fig("ndc-classes")
-# make_fig("invs13")
-# make_fig("invs15")
-make_fig("sfhh-conference")
-# make_fig("contact-primary-school")
-# make_fig("diseasome")
-# make_fig("coauth-mag-geology")
-# make_fig("tags-ask-ubuntu")
-#make_fig("coauth-mag-history")
+# # make_fig("ndc-substances")
+# # make_fig("tags-stack-overflow")
+# make_fig("email-eu")
+# # make_fig("hypertext-conference")
+# # make_fig("contact-high-school")
+# # make_fig("ndc-classes")
+# # make_fig("invs13")
+# # make_fig("invs15")
+# make_fig("sfhh-conference")
+# # make_fig("contact-primary-school")
+# # make_fig("diseasome")
+# # make_fig("coauth-mag-geology")
+# # make_fig("tags-ask-ubuntu")
+# #make_fig("coauth-mag-history")
 
-#make_fig("kaggle-whats-cooking")
-# with Pool(len(realworld_Hgraphs)) as p:
-#      print(p.map(make_fig, realworld_Hgraphs))
+# #make_fig("kaggle-whats-cooking")
+# # with Pool(len(realworld_Hgraphs)) as p:
+# #      print(p.map(make_fig, realworld_Hgraphs))
 
