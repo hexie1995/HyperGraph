@@ -77,8 +77,10 @@ class GrowingHypergraph:
                     num_added += 1
             
             # then, add completely novel nodes
-            num_to_add = np.random.poisson(beta)
-            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add):
+            
+            num_to_add2 = np.random.choice(len(beta), 1, p = beta)[0]
+            
+            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add2):
                 e_.add(i)
         
         self.add_edge(e_, log_branch = False)
@@ -93,9 +95,16 @@ class GrowingHypergraph:
         e_ = set()
         
         # num_to_add = 1 + np.random.poisson(expected_from_graph - 1)
-        num_to_add = 1 + np.random.binomial(self.H.num_nodes, expected_from_graph/self.H.num_nodes)
-        
+        try:
+            num_to_add = 1 + np.random.binomial(self.H.num_nodes, expected_from_graph/self.H.num_nodes)
+        except:
+            num_to_add = 1
         num_added = 0
+        
+        
+        if num_to_add > self.H.num_nodes:
+            num_to_add = self.H.num_nodes
+        
         
         
         if method == "ER": 
