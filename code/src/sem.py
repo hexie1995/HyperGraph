@@ -207,6 +207,7 @@ class SEM:
         count = 0
         
         my_gamma = expectation(pars["gamma"])
+        my_beta = expectation(pars["beta"])
         
         for e_ in de: 
             
@@ -218,7 +219,7 @@ class SEM:
             p1 =  (k/j)*(pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
             
             # addition of novel nodes
-            p2 = poisson(l, pars["beta"])
+            p2 = poisson(l, my_beta)
             
             
             if (ss.binom(self.new_node_sequence[-1], i - k - l)) !=0:    
