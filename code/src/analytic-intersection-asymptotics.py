@@ -16,6 +16,12 @@ class MatrixConstructor:
         """
         probably a pretty inefficient implementation
         attempts to implement alpha from the writeup
+        
+        To follow the math very closely, we should be indexing as: 
+        
+        A[i,k,ell,j,h] and A[i,k,j,ell,h]
+        
+        WHOOPS! Gotta redo indexing and reshaping. Could also just change the order in which the indices are queried, but I think that staying close to the math notation on this one is probably wise. 
         """
         
         k_max = self.k_max
@@ -24,9 +30,9 @@ class MatrixConstructor:
         GAMMA = self.pars["gamma"]
         
         I = np.arange(k_max)[:, None, None, None, None, None]
-        J = np.arange(k_max)[None, :, None, None, None, None]
-        K = np.arange(k_max)[None, None, :, None, None, None]
-        L = np.arange(k_max)[None, None, None, :, None, None]
+        K = np.arange(k_max)[None, :, None, None, None, None]
+        L = np.arange(k_max)[None, None, :, None, None, None]
+        J = np.arange(k_max)[None, None, None, :, None, None]
         H = np.arange(k_max)[None, None, None, None, :, None]
         Y = np.arange(k_max)[None, None, None, None, None, :]
         
@@ -50,17 +56,18 @@ class MatrixConstructor:
         
         print("A components")
         print(f"{sparsity = :.4f}, {nan = :.4f}")
-        
-        
+        # print(f"{S1_iy.shape =}")
         
         # second term (might not need reshaping, but check)
         S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
         # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
-        S2_kyljh = np.tile(S2_kyljh, (k_max, k_max, 1, 1, 1, 1))
+        S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
+        # print(f"{S2_kyljh.shape =}")
         
         # zero out elements where the binomial coefficients are invalid
         mask = (K > H) | (Y > L) | ( Y - K > L - H) | (H > L) | (L == 0) 
-        mask = np.tile(mask, (k_max, k_max, 1, 1, 1, 1))
+        # print(f"{mask.shape =}")
+        mask = np.tile(mask, (k_max,  1, 1, k_max, 1, 1))
         S2_kyljh[mask] = 0
         
         # just for testing
@@ -70,12 +77,14 @@ class MatrixConstructor:
         
         # third term
         S3_yljh = Y/L * binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
-        S3_yljh = np.tile(S3_yljh, (k_max, k_max, k_max, 1, k_max, 1))
+        S3_yljh = np.tile(S3_yljh, (k_max, k_max, 1, k_max, k_max, 1))
+        # print(f"{S3_yljh.shape =}")
         
         
         # need to do some more mask engineering on this term too
         mask = (Y > J) | (Y > L) | (L == 0)
-        mask = np.tile(mask, (k_max, 1, k_max, 1, k_max, 1))
+        mask = np.tile(mask, (k_max,  k_max,1, 1, k_max, 1))
+        # print(f"{mask.shape =}")
         S3_yljh[mask] = 0
         
         # just for testing
@@ -104,8 +113,8 @@ class MatrixConstructor:
         
         self.B = np.zeros((self.k_max, self.k_max, self.k_max))
         
-        eta = self.pars["eta"]
-        BETA = self.pars["beta"]
+        eta   = self.pars["eta"]
+        BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
         
         I = np.arange(self.k_max)[:, None, None]
@@ -120,7 +129,7 @@ class MatrixConstructor:
             
             self.B[i,j,k] = M[:,j,k] * sum(
                 BETA[ell]*GAMMA[i-k-ell]
-                for ell in range(1, i - k)
+                for ell in range(0, i - k + 1)
             )
         
         print("B")
@@ -130,31 +139,33 @@ class MatrixConstructor:
         print(f"{sparsity = :.4f}, {nan = :.4f}")
         
     def linear_map(self, T): 
-        self.k_max = T.shape[0]
+        
+        k_max = self.k_max
     # form a tensor for us to populate
         S = np.zeros_like(T)
         
-        for i, j, k in product(range(self.k_max), range(self.k_max), range(self.k_max)):
+        for i, j, k in product(range(k_max), range(k_max), range(k_max)):
             
             # Case 1: k = 0
             if k == 0: 
                 S[i,j,k] = 1/2*sum(
                                   T[ell,j,0]*self.A[i,0,ell,j,0] + 
                                   T[j,ell,0]*self.A[i,0,j,ell,0]
-                                  for ell in range(self.k_max)
+                                  for ell in range(k_max)
                                 )
                 # S[i,j,k] = 1 
             
             # Case 2: k >= 1
+            # hint: adding if h >= k to the below sum changes the value, which it shouldn't if we have engineered A properly. 
             else: 
                 S[i,j,k] = 1/2*sum(
-                                T[ell,j,k]*self.A[i,k,ell,j,k] + 
-                                T[j,ell,k]*self.A[i,k,j,ell,k]
-                                for ell, h in product(range(self.k_max), range(self.k_max))
+                                T[ell,j,h]*self.A[i,k,ell,j,h] + 
+                                T[j,ell,h]*self.A[i,k,j,ell,h]
+                                for ell, h in product(range(k_max), range(k_max)) if h >= k
                                 )
                 
-                S[i,j,k] += self.B[i, j, k]*(sum(
-                    T[ell,j,k] + T[j,ell,k] for ell in range(self.k_max)
+                S[i,j,k] += 1/2*self.B[i, j, k]*(sum(
+                    T[ell,j,k] + T[j,ell,k] for ell in range(k_max)
                 ))
                 # S[i, j, k] += 1
                     
