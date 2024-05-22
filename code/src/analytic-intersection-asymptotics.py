@@ -14,18 +14,86 @@ class MatrixConstructor:
         self.b_array()
         
     def a_array(self):
+        """
+        probably a pretty inefficient implementation
+        """
         
-        self.A = np.ones((self.k_max, 
-                           self.k_max, 
-                           self.k_max, 
-                           self.k_max, 
-                           self.k_max))
+        k_max = self.k_max
+        eta = self.pars["eta"]
+        BETA = self.pars["beta"]
+        GAMMA = self.pars["gamma"]
         
+        self.A = 0.00*np.ones((k_max, 
+                           k_max, 
+                           k_max, 
+                           k_max, 
+                           k_max))
+        
+        I = np.arange(k_max)[:, None, None, None, None, None]
+        J = np.arange(k_max)[None, :, None, None, None, None]
+        K = np.arange(k_max)[None, None, :, None, None, None]
+        L = np.arange(k_max)[None, None, None, :, None, None]
+        H = np.arange(k_max)[None, None, None, None, :, None]
+        Y = np.arange(k_max)[None, None, None, None, None, :]
+        
+        # first term
+        S1_iy = np.zeros((k_max, k_max))
+        for i, y in product(range(k_max), range(k_max)):
+            S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y))
+        
+        # reshape 
+        S1_iy = S1_iy[:, None, None, None, None, :]
+        S1_iy = np.tile(S1_iy, (1, k_max, k_max, k_max, k_max, 1)) 
+
+        # create mask and reshape
+        mask = Y > I 
+        mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
+        S1_iy[mask] = 0
+        
+        print(np.isnan(S1_iy).mean())
+        
+        # second term (might not need reshaping, but check)
+        S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
+        # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
+        S2_kyljh = np.tile(S2_kyljh, (k_max, k_max, 1, 1, 1, 1))
+        
+        mask = (K > H) | (Y > L) | ( Y - K > L - H) | (H > L) | (L == 0) 
+        mask = np.tile(mask, (k_max, k_max, 1, 1, 1, 1))
+        # print(mask.shape)
+        # print(S2_kyljh.shape)
+        # print(mask.shape)
+        # need to reshape
+        S2_kyljh[mask] = 0
+        
+        print(np.isnan(S2_kyljh).mean())
+        
+        # third term
+        S3_yljh = Y/L * binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
+        S3_yljh = np.tile(S3_yljh, (k_max, k_max, k_max, 1, k_max, 1))
+        
+        
+        # need to do some more mask engineering on this term too
+        mask = (Y > J) | (Y > L) | (L == 0)
+        mask = np.tile(mask, (k_max, 1, k_max, 1, k_max, 1))
+        # print(S3_yljh.shape)
+        # print(mask.shape)
+        # need to reshape
+        
+        S3_yljh[mask] = 0
+        
+        print(np.isnan(S3_yljh).mean())
+        
+        # marginalize over y
+        self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
+        # print(self.A.shape)
+          
     def b_array(self): 
         """
         array of coefficients for first term in the linear map
         
         probably wrong in various ways which need to be investigated further and tested
+        
+        need to check for zeros etc in these arrays
         """
         
         self.B = np.zeros((self.k_max, self.k_max, self.k_max))
