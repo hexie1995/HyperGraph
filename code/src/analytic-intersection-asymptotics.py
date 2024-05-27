@@ -53,8 +53,8 @@ class MatrixConstructor:
         sparsity = (S1_iy == 0).mean()
         nan = np.isnan(S1_iy).mean()
         
-        print("A components")
-        print(f"{sparsity = :.4f}, {nan = :.4f}")
+        # print("A components")
+        # print(f"{sparsity = :.4f}, {nan = :.4f}")
         self.S1_iy = S1_iy
         # print(f"{S1_iy.shape =}")
         
@@ -73,7 +73,7 @@ class MatrixConstructor:
         # just for testing
         sparsity = (S2_kyljh == 0).mean()
         nan = np.isnan(S2_kyljh).mean()
-        print(f"{sparsity = :.4f}, {nan = :.4f}")
+        # print(f"{sparsity = :.4f}, {nan = :.4f}")
         
         self.S2_kyljh = S2_kyljh
         
@@ -84,26 +84,35 @@ class MatrixConstructor:
         
         # need to do some more mask engineering on this term too
         mask =  (Y > L) | (L == 0)
-        print(f"{mask.shape =}")
+        # print(f"{mask.shape =}")
         mask = np.tile(mask, (k_max,  k_max,1, k_max, k_max, 1))
         S3_yljh[mask] = 0
         
         # just for testing
         sparsity = (S3_yljh == 0).mean()
         nan = np.isnan(S3_yljh).mean()
-        print(f"{sparsity = :.4f}, {nan = :.4f}")
+        # print(f"{sparsity = :.4f}, {nan = :.4f}")
         self.S3_yljh = S3_yljh
         
         
         # marginalize over y
         self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
+        
+        self.A_censored = self.A.copy()
+        mask = K > H
+        # print(mask.shape)
+        mask = np.tile(mask, (k_max, 1, k_max, k_max,  1, k_max))
+        # print(mask.shape)
+        self.A_censored[mask[:,:,:,:,:,0]] = 0
+        
+        
         # self.A = 1 + np.zeros_like(self.A) # just for testing
         
         # just for testing
-        print("A")
+        # print("A")
         sparsity = (self.A == 0).mean()
         nan = np.isnan(self.A).mean()
-        print(f"{sparsity = :.4f}, {nan = :.4f}")
+        # print(f"{sparsity = :.4f}, {nan = :.4f}")
         
     def b_array(self): 
         """
@@ -139,13 +148,16 @@ class MatrixConstructor:
         for i, k, j in product(range(k_max), range(k_max), range(k_max)):
             self.B[i,k,j] = M[k,j] * N[i,k]
         
-        print("B")
+        # print("B")
         sparsity = (self.B == 0).mean()
         nan = np.isnan(self.B).mean()
         
-        print(f"{sparsity = :.4f}, {nan = :.4f}")
+        # print(f"{sparsity = :.4f}, {nan = :.4f}")
         
-    def linear_map(self, T): 
+    def linear_map_(self, T): 
+        """
+        Legacy version
+        """
         
         k_max = self.k_max
     # form a tensor for us to populate
@@ -155,22 +167,21 @@ class MatrixConstructor:
             
             # Case 1: k = 0
             if k == 0: 
-                S[i,j,k] = 1/2*sum(
-                                  T[ell,j,0]*self.A[i,0,ell,j,0] + 
-                                  T[j,ell,0]*self.A[i,0,j,ell,0]
-                                  for ell in range(k_max)
-                                )
-                # S[i,j,k] = 1 
-                pass 
+                # S[i,j,k] = 1/2*sum(
+                #                   T[ell,j,0]*self.A[i,0,ell,j,0] + 
+                #                   T[j,ell,0]*self.A[i,0,j,ell,0]
+                #                   for ell in range(k_max)
+                #                 )
+                pass
             
             # Case 2: k >= 1
             # hint: adding if h >= k to the below sum changes the value, which it shouldn't if we have engineered A properly. 
             else: 
-                S[i,j,k] = 1/2*sum(
-                                T[ell,j,h]*self.A[i,k,ell,j,h] + 
-                                T[j,ell,h]*self.A[i,k,j,ell,h]
-                                for ell, h in product(range(k_max), range(k_max)) if h >= k
-                                )
+                # S[i,j,k] = 1/2*sum(
+                #                 T[ell,j,h]*self.A[i,k,ell,j,h] + 
+                #                 T[j,ell,h]*self.A[i,k,j,ell,h]
+                #                 for ell, h in product(range(k_max), range(k_max))
+                #                 )
                 
                 # very slow implementation of this term
                 # results look plausible
@@ -180,17 +191,39 @@ class MatrixConstructor:
                     
         return S
     
-    def linear_map_(self, T): 
-        
-        k_max = self.k_max
+    def linear_map(self, T): 
         
         S = np.zeros_like(T)
         
-        S[:, :, 0] = 1/2*(
-            np.einsum("kj,ikj -> ij", T[:, :, 0], self.A[:, 0, :, :, 0]) + 
-            np.einsum("kj,ijk -> ij", T[:, :, 0], self.A[:, 0, :, :, 0])
+        # case 1: k = 0
+        # S[:, :, 0] = 1/2*(
+        #     np.einsum("kj,ikj -> ij", T[:, :, 0], self.A[:, 0, :, :, 0]) + 
+        #     np.einsum("jk,ijk -> ij", T[:, :, 0], self.A[:, 0, :, :, 0])
+        # )
+        
+        # case 2: k >= 1
+        ## term 1
+        
+        to_add =  1/2*(
+            np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
+            np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
         )
         
+        # print(to_add.shape)
+        
+        # print(S[:,:,1:].shape)
+        # S[:,:, 1:] += to_add
+        
+        ## term 2 (needs checking)
+        
+        to_add = (1/2*self.B[:,1:,:]*(T.sum(axis = (0, 2)) + T.sum(axis = (1, 2)))[:, None, None])
+        to_add = np.transpose(to_add, (0, 2, 1))
+        
+        # print(to_add.shape)
+        
+        S[:,:,1:] += to_add
+        
+            
         return S
     
     def matrix_of_linear_map(self):
