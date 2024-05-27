@@ -16,12 +16,6 @@ class MatrixConstructor:
         """
         probably a pretty inefficient implementation
         attempts to implement alpha from the writeup
-        
-        To follow the math very closely, we should be indexing as: 
-        
-        A[i,k,ell,j,h] and A[i,k,j,ell,h]
-        
-        WHOOPS! Gotta redo indexing and reshaping. Could also just change the order in which the indices are queried, but I think that staying close to the math notation on this one is probably wise. 
         """
         
         k_max = self.k_max
@@ -39,16 +33,21 @@ class MatrixConstructor:
         # first term
         S1_iy = np.zeros((k_max, k_max))
         for i, y in product(range(k_max), range(k_max)):
-            S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y))
+            S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y + 1))
+        
+        # this would be a good spot to look for normalization shenanigans.
+        # S1_iy = S1_iy / S1_iy.sum(axis = 0)
         
         # reshape and tile along missing axes
         S1_iy = S1_iy[:, None, None, None, None, :]
         S1_iy = np.tile(S1_iy, (1, k_max, k_max, k_max, k_max, 1)) 
+        
 
         # create mask to zero out elements where |e \cap f| > |e|. 
         mask = Y > I 
         mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
         S1_iy[mask] = 0
+        
         
         # just for testing 
         sparsity = (S1_iy == 0).mean()
@@ -56,6 +55,7 @@ class MatrixConstructor:
         
         print("A components")
         print(f"{sparsity = :.4f}, {nan = :.4f}")
+        self.S1_iy = S1_iy
         # print(f"{S1_iy.shape =}")
         
         # second term (might not need reshaping, but check)
@@ -75,6 +75,8 @@ class MatrixConstructor:
         nan = np.isnan(S2_kyljh).mean()
         print(f"{sparsity = :.4f}, {nan = :.4f}")
         
+        self.S2_kyljh = S2_kyljh
+        
         # third term
         S3_yljh = Y/L * binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
         S3_yljh = np.tile(S3_yljh, (k_max, k_max, 1, k_max, k_max, 1))
@@ -91,6 +93,8 @@ class MatrixConstructor:
         sparsity = (S3_yljh == 0).mean()
         nan = np.isnan(S3_yljh).mean()
         print(f"{sparsity = :.4f}, {nan = :.4f}")
+        self.S3_yljh = S3_yljh
+        
         
         # marginalize over y
         self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
@@ -105,32 +109,41 @@ class MatrixConstructor:
     def b_array(self): 
         """
         array of coefficients for first term in the linear map
-        
-        probably wrong in various ways which need to be investigated further and tested
-        
-        need to check for zeros etc in these arrays
         """
         
-        self.B = np.zeros((self.k_max, self.k_max, self.k_max))
+        k_max = self.k_max
+        
+        self.B = np.zeros((k_max, k_max, k_max))
         
         eta   = self.pars["eta"]
         BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
         
-        I = np.arange(self.k_max)[:, None, None]
-        J = np.arange(self.k_max)[None, :, None]
-        K = np.arange(self.k_max)[None, None, :]
+        # I = np.arange(k_max)[:, None, None]
+        K = np.arange(k_max)[:, None]
+        J = np.arange(k_max)[None, :]
+        # L = np.arange(k_max)[None, None, :]
         
-        M = K/J * binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
+        # first term: probability of intersection of size k
+        M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
         mask = (K > J) | (J == 0)
         M[mask] = 0
-                   
-        for i, j, k in product(range(self.k_max), range(self.k_max), range(self.k_max)):
-            
-            self.B[i,j,k] = M[:,j,k] * sum(
+        # self.M = M
+        
+        # second term: probability of edge of size i given intersection of size k
+        
+        N = np.zeros((k_max, k_max))
+        for i, k in product(range(k_max), range(k_max)):
+            N[i, k] = sum(
                 BETA[ell]*GAMMA[i-k-ell]
                 for ell in range(0, i - k + 1)
             )
+        
+        N = N / N.sum(axis = 0)
+        # self.N = N
+        
+        for i, k, j in product(range(k_max), range(k_max), range(k_max)):
+            self.B[i,k,j] = M[k,j] * N[i,k]
         
         print("B")
         sparsity = (self.B == 0).mean()
@@ -154,6 +167,7 @@ class MatrixConstructor:
                                   for ell in range(k_max)
                                 )
                 # S[i,j,k] = 1 
+                pass 
             
             # Case 2: k >= 1
             # hint: adding if h >= k to the below sum changes the value, which it shouldn't if we have engineered A properly. 
@@ -164,10 +178,11 @@ class MatrixConstructor:
                                 for ell, h in product(range(k_max), range(k_max)) if h >= k
                                 )
                 
-                S[i,j,k] += 1/2*self.B[i, j, k]*(sum(
-                    T[ell,j,k] + T[j,ell,k] for ell in range(k_max)
+                # very slow implementation of this term
+                # results look plausible
+                S[i,j,k] += 1/2*self.B[i, k, j]*(sum(
+                    T[ell,j,h] + T[j,ell,h] for ell in range(k_max) for h in range(k_max)
                 ))
-                # S[i, j, k] += 1
                     
         return S
     
