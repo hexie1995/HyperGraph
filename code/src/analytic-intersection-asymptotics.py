@@ -46,7 +46,7 @@ class MatrixConstructor:
         # create mask to zero out elements where |e \cap f| > |e|. 
         mask = Y > I 
         mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
-        S1_iy[mask] = 0
+        # S1_iy[mask] = 0
         
         
         # just for testing 
@@ -65,9 +65,9 @@ class MatrixConstructor:
         # print(f"{S2_kyljh.shape =}")
         
         # zero out elements where the binomial coefficients are invalid
-        mask = (K > H) | (Y > L) | ( Y - K > L - H) | (H > L) | (L == 0) 
+        mask = (K > H) | (Y > L) | (Y - K > L - H) | (H > L) | (H > J) | (L == 0) | (J == 0)
         # print(f"{mask.shape =}")
-        mask = np.tile(mask, (k_max,  1, 1, k_max, 1, 1))
+        mask = np.tile(mask, (k_max,  1, 1, 1, 1, 1))
         S2_kyljh[mask] = 0
         
         # just for testing
@@ -78,15 +78,14 @@ class MatrixConstructor:
         self.S2_kyljh = S2_kyljh
         
         # third term
-        S3_yljh = Y/L * binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
+        S3_yljh = binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
         S3_yljh = np.tile(S3_yljh, (k_max, k_max, 1, k_max, k_max, 1))
         # print(f"{S3_yljh.shape =}")
         
-        
         # need to do some more mask engineering on this term too
-        mask = (Y > J) | (Y > L) | (L == 0)
-        mask = np.tile(mask, (k_max,  k_max,1, 1, k_max, 1))
-        # print(f"{mask.shape =}")
+        mask =  (Y > L) | (L == 0)
+        print(f"{mask.shape =}")
+        mask = np.tile(mask, (k_max,  k_max,1, k_max, k_max, 1))
         S3_yljh[mask] = 0
         
         # just for testing
@@ -119,10 +118,8 @@ class MatrixConstructor:
         BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
         
-        # I = np.arange(k_max)[:, None, None]
         K = np.arange(k_max)[:, None]
         J = np.arange(k_max)[None, :]
-        # L = np.arange(k_max)[None, None, :]
         
         # first term: probability of intersection of size k
         M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
@@ -138,9 +135,6 @@ class MatrixConstructor:
                 BETA[ell]*GAMMA[i-k-ell]
                 for ell in range(0, i - k + 1)
             )
-        
-        N = N / N.sum(axis = 0)
-        # self.N = N
         
         for i, k, j in product(range(k_max), range(k_max), range(k_max)):
             self.B[i,k,j] = M[k,j] * N[i,k]
@@ -184,6 +178,19 @@ class MatrixConstructor:
                     T[ell,j,h] + T[j,ell,h] for ell in range(k_max) for h in range(k_max)
                 ))
                     
+        return S
+    
+    def linear_map_(self, T): 
+        
+        k_max = self.k_max
+        
+        S = np.zeros_like(T)
+        
+        S[:, :, 0] = 1/2*(
+            np.einsum("kj,ikj -> ij", T[:, :, 0], self.A[:, 0, :, :, 0]) + 
+            np.einsum("kj,ijk -> ij", T[:, :, 0], self.A[:, 0, :, :, 0])
+        )
+        
         return S
     
     def matrix_of_linear_map(self):
