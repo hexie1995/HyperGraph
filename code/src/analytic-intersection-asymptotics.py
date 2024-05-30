@@ -169,7 +169,7 @@ class MatrixConstructor:
         
         # case 2: k >= 1
         ## term 1
-        to_add =  1/2*(
+        to_add =  1*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
         )
@@ -177,7 +177,7 @@ class MatrixConstructor:
         
         ## term 2
         # this USES  h = 0 cases in the input tensor T
-        to_add = 1/2*(
+        to_add = 1*(
             np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
             np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
             )
