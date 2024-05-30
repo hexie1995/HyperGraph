@@ -132,14 +132,14 @@ class MatrixConstructor:
         
         # first term: probability of intersection of size k
         M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
-        mask = (K > J) | (J == 0)
+        mask = (K > J) | (J == 0) 
         M[mask] = 0
         # self.M = M
         
         # second term: probability of edge of size i given intersection of size k
         
         N = np.zeros((k_max, k_max))
-        for i, k in product(range(k_max), range(k_max)):
+        for i, k in product(range(1, k_max), range(k_max)):
             N[i, k] = sum(
                 BETA[ell]*GAMMA[i-k-ell]
                 for ell in range(0, i - k + 1)
@@ -154,76 +154,36 @@ class MatrixConstructor:
         
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
         
-    def linear_map_(self, T): 
-        """
-        Legacy version
-        """
-        
-        k_max = self.k_max
-    # form a tensor for us to populate
-        S = np.zeros_like(T)
-        
-        for i, j, k in product(range(k_max), range(k_max), range(k_max)):
-            
-            # Case 1: k = 0
-            if k == 0: 
-                # S[i,j,k] = 1/2*sum(
-                #                   T[ell,j,0]*self.A[i,0,ell,j,0] + 
-                #                   T[j,ell,0]*self.A[i,0,j,ell,0]
-                #                   for ell in range(k_max)
-                #                 )
-                pass
-            
-            # Case 2: k >= 1
-            # hint: adding if h >= k to the below sum changes the value, which it shouldn't if we have engineered A properly. 
-            else: 
-                # S[i,j,k] = 1/2*sum(
-                #                 T[ell,j,h]*self.A[i,k,ell,j,h] + 
-                #                 T[j,ell,h]*self.A[i,k,j,ell,h]
-                #                 for ell, h in product(range(k_max), range(k_max))
-                #                 )
-                
-                # very slow implementation of this term
-                # results look plausible
-                S[i,j,k] += 1/2*self.B[i, k, j]*(sum(
-                    T[ell,j,h] + T[j,ell,h] for ell in range(k_max) for h in range(k_max)
-                ))
-                    
-        return S
-    
     def linear_map(self, T): 
         
         S = np.zeros_like(T)
         
         # case 1: k = 0
-        # S[:, :, 0] = 1/2*(
-        #     np.einsum("kj,ikj -> ij", T[:, :, 0], self.A[:, 0, :, :, 0]) + 
-        #     np.einsum("jk,ijk -> ij", T[:, :, 0], self.A[:, 0, :, :, 0])
-        # )
+        # this CREATES k = 0 cases in the output tensor S
+        # it does so by *also* using h = 0 cases in the input tensor T
+        to_add = 1/2*(
+            np.einsum("lj,ilj -> ij", T[:,:,0], self.A[:,0,:,:,0]) + 
+            np.einsum("jl,ijl -> ij", T[:,:,0], self.A[:,0,:,:,0])
+        )
+        S[:,:,0] = to_add
         
         # case 2: k >= 1
         ## term 1
-        
         to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
         )
+        S[:,:,1:] += to_add
         
-        # print(to_add.shape)
-        
-        # print(S[:,:,1:].shape)
-        # S[:,:, 1:] += to_add
-        
-        ## term 2 (needs checking)
-        
-        to_add = (1/2*self.B[:,1:,:]*(T.sum(axis = (0, 2)) + T.sum(axis = (1, 2)))[:, None, None])
-        to_add = np.transpose(to_add, (0, 2, 1))
-        
-        # print(to_add.shape)
+        ## term 2
+        # this USES  h = 0 cases in the input tensor T
+        to_add = 1/2*(
+            np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
+            np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
+            )
         
         S[:,:,1:] += to_add
         
-            
         return S
     
     def matrix_of_linear_map(self):
@@ -240,6 +200,33 @@ class MatrixConstructor:
             M[:, i] = v
 
         return M
+    
+    def linear_map_on_zeros(self, T):
+        """
+        just for testing
+        purpose is to test the entries of the matrix self.A corresponding to zero intersections h and k
+        I think that the linear map defined by this segment of the matrix should be stochastic. 
+        """
+         
+        return 1/2*(
+            np.einsum("lj,ilj -> ij", T[:, :], self.A[:, 0, :, :, 0]) + 
+            np.einsum("jl,ijl -> ij", T[:, :], self.A[:, 0, :, :, 0])
+        )
+        
+    def matrix_of_map_on_zeros(self):
+            
+            I = np.eye(self.k_max**2)
+            M = np.zeros((self.k_max**2, self.k_max**2))
+            
+            for i in range(self.k_max**2):
+                
+                u = I[:, i]
+                T = u.reshape(self.k_max, self.k_max)
+                S = self.linear_map_on_zeros(T)
+                v = S.reshape(self.k_max**2)
+                M[:, i] = v
+    
+            return M
     
 def vec_to_tensor(u, k_max): 
     return u.reshape((k_max, k_max, k_max))
