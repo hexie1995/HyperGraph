@@ -188,15 +188,17 @@ class MatrixConstructor:
     
     def matrix_of_linear_map(self):
         
-        I = np.eye(self.k_max**3)
-        M = np.zeros((self.k_max**3, self.k_max**3))
+        k_max = self.k_max
         
-        for i in range(self.k_max**3):
+        I = np.eye(k_max**3)
+        M = np.zeros((k_max**3, k_max**3))
+        
+        for i in range(k_max**3):
             
             u = I[:, i]
-            T = vec_to_tensor(u, self.k_max)
+            T = vec_to_tensor(u, k_max)
             S = self.linear_map(T)
-            v = tensor_to_vec(S, self.k_max)
+            v = tensor_to_vec(S, k_max)
             M[:, i] = v
 
         return M
@@ -214,19 +216,21 @@ class MatrixConstructor:
         )
         
     def matrix_of_map_on_zeros(self):
+        
+        k_max = self.k_max
+        
+        I = np.eye(k_max**2)
+        M = np.zeros((k_max**2, k_max**2))
+        
+        for i in range(k_max**2):
             
-            I = np.eye(self.k_max**2)
-            M = np.zeros((self.k_max**2, self.k_max**2))
-            
-            for i in range(self.k_max**2):
-                
-                u = I[:, i]
-                T = u.reshape(self.k_max, self.k_max)
-                S = self.linear_map_on_zeros(T)
-                v = S.reshape(self.k_max**2)
-                M[:, i] = v
-    
-            return M
+            u = I[:, i]
+            T = u.reshape(k_max, k_max)
+            S = self.linear_map_on_zeros(T)
+            v = S.reshape(k_max**2)
+            M[:, i] = v
+
+        return M
     
 def vec_to_tensor(u, k_max): 
     return u.reshape((k_max, k_max, k_max))
