@@ -1,3 +1,38 @@
+import xgi 
+from matplotlib import pyplot as plt 
+import seaborn as sns
+import numpy as np
+import os 
+import pandas as pd
+import pickle
+import matplotlib.colors as mcolors
+from itertools import product
+from scipy.special import binom
+from multiprocessing import Pool
+import matplotlib as mpl
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+import importlib 
+import time
+from sod import *
+from scipy.interpolate import make_interp_spline, BSpline
+m = importlib.import_module(".model", "src")
+ll = importlib.import_module(".likelihoods", "src")
+
+def expectation(x):
+    
+    to_sum = [(i)*j for i,j in enumerate(x)]
+      
+    return sum(to_sum)
+realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history",
+                     "diseasome", "kaggle-whats-cooking", "ndc-classes", "ndc-substances",
+                     "tags-ask-ubuntu", "tags-math-sx" , "tags-stack-overflow", "threads-ask-ubuntu", 
+                     "threads-math-sx", "threads-stack-overflow",
+                     "congress-bills", "contact-high-school", "contact-primary-school",
+                     "email-enron", "email-eu", "hospital-lyon", "hypertext-conference", 
+                     "invs13", "invs15",  "malawi-village", "science-gallery", "sfhh-conference"]
+
+
+
 # p_gamma = -np.sort(-np.random.exponential(scale=1.0, size=10))
 # p_gamma = list(p_gamma / p_gamma.sum())
 
@@ -147,6 +182,7 @@ def return_values(parameters, timesteps):
             ASSORT_T2_ER.append(xgi.degree_assortativity(H.H, kind = "top-2", exact = True))
             CLUSTER_ER.append(np.mean(list(xgi.clustering_coefficient(H.H).values())))
 
+            G = xgi.subhypergraph(H.H, edges=H.H.edges.filterby("order", max_order, "leq")).copy()
         
             SF_ER.append(edit_simpliciality(G, min_size=min_size))
             FES_ER.append(face_edit_simpliciality(G, min_size=min_size))
