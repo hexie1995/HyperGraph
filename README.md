@@ -41,12 +41,13 @@ The above environment has been tested to build successfully and run all the foll
 </div>
 
 <h2 align="center">Figure Generation Instructions </h2>
-1. Figure 1 is genereated as a Toy Model via Google Drawing.
-2. Figure 2 is generated via running: a) `Fig2_calculate_properties_cluster_part.py`, b) `Fig2_Hypergraph_Properties_plotting_part.py`. Feel free to check `Fig2-Hypergraph Properties- plotting part.ipynb` for the display of figure. 
-3. Figure 3 is generated via running: a) `REAL_WORLD_SEM.py`(note the comments for the difference of generation of real-world xgi datasets and the bio-medical datasets), b) `Help_Figures.py` (which should generate parameters.csv if run properly), c) ``. 
-4. Figure 4 is generated via running: a) 
-5. Figure 5 is generated via running: a)
 
+1. Figure 1 is genereated as a Toy Model via Google Drawing.
+2. Figure 2 is generated via running: a) `Fig2_calculate_properties_cluster_part.py`, b) `Fig2_Hypergraph_Properties_plotting_part.py`. Feel free to check `Fig2-Hypergraph Properties- plotting part.ipynb` for the display of figure.
+3. Figure 3 is generated via running: a) `REAL_WORLD_SEM.py`(note the comments for the difference of generation of real-world xgi datasets and the bio-medical datasets, if run correctly, you should see a folder named `sem_results_new` with results file for each xgi dataset), b) `Fig3-degree-and-size-distributions.py`.
+4. Figure 4 is generated via running: a)  TO UPDATED WITH THE NEW INTERSECTION PLOTS. 
+5. Figure 5 and Table S1 (with recovered parameters) is generated via running: a) `REAL_WORLD_SEM.py`, b) `Fig5-ScatterPlot-Table1and2.py`. Use `Fig5-ScatterPlot-Table1and2.ipynb` to view the printed table and figure. 
+6. In order to generate AUC scores for all of the XGI datasets/bio-medical datasets, please run `LP-REAL-WORLD.py`(note the comments for the difference of generation of real-world xgi datasets and the bio-medical datasets). After the run completed for both temporal dependent datasets and non-temporal datasets, run `Fig5-ScatterPlot-Table1and2.py` for printing of the link prediction results. 
 
 </div>
 
