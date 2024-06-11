@@ -28,7 +28,7 @@ $ xgi.__version__
 Note:
 
 1. If you wish to recreate the degree distribution plot, you need to install the code accompany the paper [The simpliciality of higher-order networks](https://github.com/nwlandry/the-simpliciality-of-higher-order-networks) because of the dependency of for edit simplicity and face edit simplicity. Please also cite the original paper if used.
-2. The data folder contains NOT xgi dataset (which can be obtained from the xgi package directly), but rather the three bio-medical dataset used in both [Logical Hypergraph Link Prediction](https://github.com/yang1992samantha/LHP) and [Neural Hypergraph Link Prediction](chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://malllabiisc.github.io/publications/papers/nhp_cikm20.pdf). See their papers for clear reference and please cite the original paper if used. 
+2. The data folder contains NOT xgi dataset (which can be obtained from the xgi package directly), but rather the three bio-medical dataset used in both [Logical Hypergraph Link Prediction](https://github.com/yang1992samantha/LHP) and [Neural Hypergraph Link Prediction](https://malllabiisc.github.io/publications/papers/nhp_cikm20.pdf). See their papers for clear reference and please cite the original paper if used. 
 
 ```bash
 pip install python==3.10.13 xgi==0.8.2
