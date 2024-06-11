@@ -13,7 +13,7 @@ class SEM:
         self.ll_history = []
         
         if not pars: 
-            pars = {"eta" : 0.5, "beta" : 0.5, "gamma" : [1/50]*50}
+            pars = {"eta" : 0.5, "beta" : [1/50]*50, "gamma" : [1/50]*50}
         self.pars = pars
         
         self.H = H
@@ -35,12 +35,12 @@ class SEM:
         if self.memoize: 
             self.esl = functools.cache(lambda k, j: self.esl_base(k, j, eta = self.pars["eta"]))
             self.nfl = functools.cache(lambda h: self.nfl_base(h, gamma = expectation(self.pars["gamma"])))
-            self.nnl = functools.cache(lambda l: self.nnl_base(l, beta = self.pars["beta"]))
+            self.nnl = functools.cache(lambda l: self.nnl_base(l, beta = expectation(self.pars["beta"])))
             
         else: 
             self.esl = lambda k, j: self.esl_base(k, j, eta = self.pars["eta"])
             self.nfl = lambda h: self.nfl_base(h, gamma = expectation(self.pars["gamma"]))
-            self.nnl = lambda l: self.nnl_base(l, beta = self.pars["beta"])
+            self.nnl = lambda l: self.nnl_base(l, beta = expectation(self.pars["beta"]))
         
     def sample_edge_with_neighborhood(self, min_time = 0, require_neighbors = True):
         while True: 
@@ -62,7 +62,7 @@ class SEM:
                       
         S = np.zeros(4) 
         S_gamma = np.zeros(len(self.pars["gamma"]))
-        
+        S_beta = np.zeros(len(self.pars["beta"]))
         
         P = 0 
         
@@ -79,6 +79,7 @@ class SEM:
 #         high_idx = sorted(range(len(sorted_de)), key=lambda x: sorted_de[x])[-1:]
 #         filtered_de = (np.array(de)[high_idx]).tolist()
         my_gamma = expectation(self.pars["gamma"])
+        my_beta = expectation(self.pars["beta"])
         
         for e_ in de: 
             j = len(e_)
@@ -93,7 +94,7 @@ class SEM:
             
             # addition of novel nodes
             try:
-                p2 = poisson(l, self.pars["beta"])
+                p2 = poisson(l, my_beta)/(ss.binom(self.new_node_sequence[-1], l))
             except:
                 p2 = 0
             
@@ -111,16 +112,19 @@ class SEM:
                 
                 S_gamma[i-k-l] = S_gamma[i-k-l] + p
             
-            
+            if l < len(self.pars["beta"]):
+
+                S_beta[l] = S_beta[l] + p            
         
         if P!=0:
             S /= P
             S_gamma /= P
+            S_beta /= P
         else:
             pass
         
         
-        return S, S_gamma
+        return S, S_gamma, S_beta
     
     def SE_step(self, min_time = 0, batch_size = 1):
         """
@@ -129,24 +133,26 @@ class SEM:
         
         #print(self.pars["gamma"])
         mean_gamma = np.zeros(len(self.pars["gamma"]))
+        mean_beta = np.zeros(len(self.pars["beta"]))
         mean_S = np.zeros(4)
         
         for _ in range(batch_size):
             e, eid, de = self.sample_edge_with_neighborhood(min_time, True)
-            S, S_gamma          = self.expected_sufficient_statistics(e, eid, de)
+            S, S_gamma, S_beta = self.expected_sufficient_statistics(e, eid, de)
         
             mean_S += S
             mean_gamma += S_gamma
+            mean_beta += S_beta
         
         mean_S /= batch_size
         mean_gamma /= batch_size
-        
+        mean_beta /= batch_size
         
 #         l1 = list(range(1, len(self.pars["gamma"])+1))
 #         gamma_counts = Counter(cumulative_gamma)
 #         occurrences = [gamma_counts[v]+1 for v in l1]
     
-        return mean_S, mean_gamma
+        return mean_S, mean_gamma, mean_beta
 
     def SEM_step(self, rho,  **kwargs):
         """
@@ -157,7 +163,7 @@ class SEM:
         # according to the original paper and some research, the convergence of SEM is largely dependent on rho.
 
         # technically, this is the stochastic E step
-        S, S_gamma = self.SE_step(**kwargs)
+        S, S_gamma, S_beta = self.SE_step(**kwargs)
         
         # this is the stochastic M step
         # technically it's an optimization problem, but we can again do it in closed form
@@ -165,7 +171,10 @@ class SEM:
         gamma_update = S_gamma
         #gamma_update = [v/sum(S_gamma) for v in S_gamma] 
         #gamma_update = S[2]
-        beta_update  = S[3] 
+        #beta_update  = S[3] 
+        beta_update = S_beta
+        
+        
         
         
         
@@ -173,7 +182,7 @@ class SEM:
         # now we average the current estimates with the new ones
         self.pars["eta"]   = (1 - rho)*self.pars["eta"]   + rho *eta_update
         self.pars["gamma"] = ((1 - rho)*np.array(self.pars["gamma"]) + rho*np.array(gamma_update)).tolist()
-        self.pars["beta"]  = (1 - rho)*self.pars["beta"]  + rho*beta_update
+        self.pars["beta"]  = ((1 - rho)*np.array(self.pars["beta"]) + rho*np.array(beta_update)).tolist()
         
         self.cache_likelihoods()
         
@@ -201,6 +210,7 @@ class SEM:
         count = 0
         
         my_gamma = expectation(pars["gamma"])
+        my_beta = expectation(pars["beta"])
         
         for e_ in de: 
             
@@ -212,7 +222,7 @@ class SEM:
             p1 =  (k/j)*(pars["eta"]**(k - 1.0))*((1.0 - pars["eta"])**(j - k))
             
             # addition of novel nodes
-            p2 = poisson(l, pars["beta"])
+            p2 = poisson(l, my_beta)
             
             
             if (ss.binom(self.new_node_sequence[-1], i - k - l)) !=0:    

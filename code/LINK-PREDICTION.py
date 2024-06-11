@@ -1,4 +1,3 @@
-# +
 import cProfile
 # cProfile.run("process_real_world_dataset('email-enron')", sort="tottime")
 import importlib 
@@ -9,7 +8,7 @@ ll = importlib.import_module(".likelihoods", "src")
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
 from random import shuffle
-from sklearn.metrics import roc_curve, auc, precision_recall_curve, f1_score, recall_score,roc_auc_score
+from sklearn.metrics import roc_curve, auc, precision_recall_curve, f1_score, recall_score
 import numpy as np
 import xgi
 import copy
@@ -21,8 +20,6 @@ import scipy.special as ss
 import json
 import pickle
 import os
-from itertools import product
-
 def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
     
     #if not ax: 
@@ -32,7 +29,7 @@ def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
              ll.guaranteed_edge_sample_likelihood,
              ll.nodes_from_hypergraph_likelihood,
              ll.novel_nodes_likelihood,
-             memoize = False)
+             memoize = True)
     # pars = init_pars.copy(), 
     
     epochs = int(steps / batch_size)
@@ -88,8 +85,8 @@ def generate_negative_samples(H, num):
     
     return neg_edges
 
-def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 100000, 
-                              randomize = False, use_all_test = False):
+def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 500, 
+                              randomize = True, use_all_test = False):
 
     # 1. There are multiple ways to to do this, but right now, it is assumed that each edge's probability are calculated independently
     # 2. If a dataset has more than 50k edges, we skip to SEM
@@ -103,54 +100,38 @@ def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 1000
     train_timesteps = round(H0.num_edges*percent_seen)
     test_timesteps = total_timesteps - train_timesteps
 
-
     
-    if not use_all_test:
-        num_sampled = min(num_to_draw, test_timesteps)
+    if test_timesteps > 10000:
+        test_timesteps = 10000
+    
+    
+    if test_timesteps > num_to_draw and not use_all_test:
+        num_sampled = num_to_draw
     elif use_all_test:
         num_sampled = test_timesteps
 
-    if not randomize:
-        H1 = xgi.Hypergraph()
-        for i in range(train_timesteps):
-            H1.add_edge(H0.edges.members(i))
 
-        # this is the graphs that we have observed
-        H1 = m.GrowingHypergraph(H1)
+    H1 = xgi.Hypergraph()
+    for i in range(train_timesteps):
+        H1.add_edge(H0.edges.members(i))
+
+    # this is the graphs that we have observed
+    H1 = m.GrowingHypergraph(H1)
 
 
-        pos_edges = []
-        for i in range(train_timesteps, train_timesteps + num_sampled):    
-            pos_edges.append(list(H0.edges.members(i)))
-    
-    elif randomize:
-        
-        H1 = xgi.Hypergraph()
-        
-        total_edges = list(range(total_timesteps))
-        train_edges = random.sample(range(total_timesteps), train_timesteps)
-        test_edges = list(set(total_edges).difference(train_edges))        
-        
-        for i in train_edges:
-            H1.add_edge(H0.edges.members(i))
+    neg_edges = generate_negative_samples(H1.H, num_sampled)
+    pos_edges = []
 
-        # this is the graphs that we have observed
-        H1 = m.GrowingHypergraph(H1)
+    for i in range(train_timesteps, train_timesteps + num_sampled):    
+        pos_edges.append(list(H0.edges.members(i)))
 
-        pos_edges = []
-        for i in range(num_sampled):
-            j = test_edges[i]
-            pos_edges.append(list(H0.edges.members(j)))
-        
-    neg_edges = generate_negative_samples(H1.H, num_sampled)        
-    
     to_pred = [list(x) for x in pos_edges] + [list(x) for x in neg_edges]
     true_label = [1]*num_sampled + [0]*num_sampled
-    
+
     return H0, H1, to_pred, true_label
 
-def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 100000, 
-                              randomize = True, use_all_test = True):
+def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 500, 
+                              randomize = True, use_all_test = False):
 
     Dir = r"../data//"
     with open(os.path.join(Dir, data_name + '_pos.pkl'), 'rb') as h: pos_edges = pickle.load(h)
@@ -172,8 +153,8 @@ def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 10000
     test_timesteps = total_timesteps - train_timesteps
 
 
-    if not use_all_test:
-        num_sampled = min(num_to_draw, test_timesteps)
+    if test_timesteps > num_to_draw and not use_all_test:
+        num_sampled = num_to_draw
     elif use_all_test:
         num_sampled = test_timesteps
 
@@ -198,23 +179,16 @@ def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 10000
     return H0, H1, to_pred, true_label
 
 
-# +
-def SEM_link_prediction(data_name, randomize_key, use_only_train = True):
+def SEM_link_prediction(data_name, use_only_train = True):
     
     
     #H0, H1, edges_pred, labels = process_real_world_dataset(data_name)
     
-#     H0, H1, edges_pred, labels = process_real_world_dataset(data_name, 
-#                                                             percent_seen = 0.2, 
-#                                                             num_to_draw = 100000, 
-#                                                             randomize = randomize_key, 
-#                                                             use_all_test = False)
-
-    H0, H1, edges_pred, labels = process_benchmark_dataset(data_name, 
-                                                            percent_seen = 0.5, 
-                                                            num_to_draw = 100000, 
-                                                            randomize = randomize_key, 
-                                                            use_all_test = False)
+    H0, H1, edges_pred, labels = process_real_world_dataset(data_name, 
+                                                            percent_seen = 0.2, 
+                                                            num_to_draw = 500, 
+                                                            randomize = True, 
+                                                            use_all_test = True)
     
     
     if not use_only_train:
@@ -238,21 +212,17 @@ def SEM_link_prediction(data_name, randomize_key, use_only_train = True):
         PRED.append(EM.predict(H0, edge, PARS))
 
     fpr, tpr, _ = roc_curve(labels, PRED)
-    
+    roc_auc = auc(fpr, tpr)
     
     # Default threshold to median of the results because of balanced class. 
     threshold = np.median(PRED)
     y_true = labels.copy()
     y_pred = [1 if x>=threshold else 0 for x in PRED]
-    rec_score = recall_score(y_true, y_pred)
-    roc_auc = roc_auc_score(y_true, PRED)
     
+    rec_score = recall_score(y_true, y_pred)
     f1_ = f1_score(y_true, y_pred)
 
     return roc_auc, rec_score, f1_
-
-
-# -
 
 def expectation(x):
     
@@ -261,45 +231,24 @@ def expectation(x):
     return sum(to_sum)
 
 
-def SEM_prediction_results(data_, trial):
+def SEM_prediction_results(trial):
     
-    #data_ = "email-enron"
-    roc_auc, rec_score, f1_ = SEM_link_prediction(data_, randomize_key = True, use_only_train = True)
+    data_ = "email-enron"
+    roc_auc, rec_score, f1_ = SEM_link_prediction(data_, use_only_train = True)
     D = {"AUC": roc_auc, "recall" : rec_score, "f1": f1_}
-    print(D)
-    Dir = r"lp_100k_random/"
-    with open(os.path.join(Dir, data_ + '_trainOnly_'+ str(trial)+ '.pkl'), 'wb') as h: pickle.dump(D, h)
-
+    Dir = r"lp_results/"
+    with open(os.path.join(Dir, data_ + '_20runs_trainOnly_'+ str(trial)+ '.pkl'), 'wb') as h: pickle.dump(D, h)
 
 # +
 # To run the real-world networks in XGI parallely for 10 randomized run, call the following function. 
 
-smaller_Hgraphs = ["congress-bills", "contact-high-school", "contact-primary-school", "dawn", "diseasome", 
-                   "email-enron", "email-eu", "hospital-lyon", "hypertext-conference", "invs13", "invs15", 
-                   "kaggle-whats-cooking", "malawi-village", "ndc-classes", "ndc-substances", "science-gallery", 
-                   "sfhh-conference"]
-                                          
-bigger_Hgraphs= ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", "tags-ask-ubuntu", "tags-math-sx", 
-                 "tags-stack-overflow", "threads-ask-ubuntu", "threads-math-sx", "threads-stack-overflow"]
+import time
+trials = list(range(20))
+start = time.time()
 
-trials = list(range(10))
+SEM_prediction_results(0)
 
+print(time.time()-start)
 
-to_para = list(product(smaller_Hgraphs, trials))
-#SEM_prediction_results(0)
-
-
-# with Pool(len(to_para)) as p:
-#     print(p.starmap(SEM_prediction_results, to_para))
-
-# +
-# with Pool(len(to_para[0:1])) as p:
-#     print(p.starmap(SEM_prediction_results, to_para[0:1]))
-# -
-
-for d_ in bench_mark:
-    for kk in range(10):
-        SEM_prediction_results(d_, kk)
-
-
-SEM_prediction_results("uspto", 0)
+# with Pool(len(trials)) as p:
+#     print(p.map(SEM_prediction_results, trials))

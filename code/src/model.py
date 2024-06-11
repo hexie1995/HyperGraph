@@ -77,25 +77,51 @@ class GrowingHypergraph:
                     num_added += 1
             
             # then, add completely novel nodes
-            num_to_add = np.random.poisson(beta)
-            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add):
+            
+            num_to_add2 = np.random.choice(len(beta), 1, p = beta)[0]
+            
+            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add2):
                 e_.add(i)
         
         self.add_edge(e_, log_branch = False)
         return e_
     
     
-    def sample_edge_alternative(self, method, expected_from_graph, expected_new):
+    def sample_edge_alternative(self, method, exact, exact_num_nodes, expected_from_graph, expected_new):
         """
-        growing Erdos-Renyi graph or preferential attachment graph
+        growing Erdos-Renyi graph or preferential attachment graph based on TECH
+        
+        input:
+        method: str, decide whether to use ER or PA, only two options. 
+        exact: bool, decides whether the edge size is exactly the same as the TECH model at each timestamp.
+        exact_num_nodes: int, see above, but also minus the number of newly added nodes, so be careful here.
+        expected_from_graph: int, expected number of edges, only is needed when exact = False. 
+        expected_new: int, new nodes added from the completely novel nodes paradigm. 
+        
+        output:
+        e_: set, the newly added edge in xgi edge format (a set). 
+        self: at the same time updates the hypergraph to add one edge at a time. 
+        
         """
+        
         
         e_ = set()
         
-        # num_to_add = 1 + np.random.poisson(expected_from_graph - 1)
-        num_to_add = 1 + np.random.binomial(self.H.num_nodes, expected_from_graph/self.H.num_nodes)
+        if exact:
+            num_to_add = exact_num_nodes
         
-        num_added = 0
+        elif not exact:
+            # num_to_add = 1 + np.random.poisson(expected_from_graph - 1)
+            try:
+                num_to_add = 1 + np.random.binomial(self.H.num_nodes, expected_from_graph/self.H.num_nodes)
+            except:
+                num_to_add = 1
+            num_added = 0
+
+        
+        if num_to_add > self.H.num_nodes:
+            num_to_add = self.H.num_nodes
+        
         
         
         if method == "ER": 

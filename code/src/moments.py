@@ -50,11 +50,11 @@ def method_of_moments_estimator(H, theta0 = None, max_init = 100):
             
             theta0 = np.random.rand(3)
 
-            theta_hat = fsolve(f, theta0)
-            obj = np.sqrt((f(theta_hat)**2).mean())
-            
-            if (obj < 1e-8) and is_valid(theta_hat):
-                return theta_hat, obj
+        theta_hat = fsolve(f, theta0)
+        obj = np.sqrt((f(theta_hat)**2).mean())
+        
+        if (obj < 1e-8) and is_valid(theta_hat):
+            return theta_hat, obj
 
-    print(f"No valid solution reached in {max_init} initializations")
+    print("No valid solution reached in {max_init} initializations")
     return np.array([-1, -1, -1]), np.inf

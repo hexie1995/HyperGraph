@@ -21,30 +21,35 @@ import json
 import os
 import pickle
 
-# init_pars = {"eta"   : 0.3, 
-#              "beta"  : 0.7, 
-#              "gamma" : [1/35]*35}
 
 
 
 # track the parameter estimates over time
 
-def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
+def experiment(H, g_len, steps = 5000, ax = None, batch_size = 30, verbose = False):
     
     #if not ax: 
     #    fig, ax = plt.subplots(1, 1)
-        
+    
+    
+    init_pars = {"eta" : 0.5, "beta" : [1/10]*10, "gamma" : [1/g_len]*g_len}
+    
+    
     EM = sem.SEM(H, 
              ll.guaranteed_edge_sample_likelihood,
              ll.nodes_from_hypergraph_likelihood,
              ll.novel_nodes_likelihood,
-             memoize = False)
+             memoize = False,
+             pars = init_pars.copy())
+    
+    
     # pars = init_pars.copy(), 
+    
     
     epochs = int(steps / batch_size)
     
     ETA   = np.zeros(epochs)
-    BETA  = np.zeros(epochs)
+    BETA  = []
     GAMMA = []
 
     # main loop
@@ -57,7 +62,7 @@ def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
             
         EM.SEM_step(0.002*batch_size, batch_size = batch_size) # both the stochastic E and the M steps are in here
         ETA[i] = EM.pars["eta"]
-        BETA[i] = EM.pars["beta"]
+        BETA.append(EM.pars["beta"])
         GAMMA.append(EM.pars["gamma"])
     
     
@@ -69,11 +74,12 @@ def run_real_world(data_name):
     
     H0 = xgi.load_xgi_data(data_name)
     H0 = m.GrowingHypergraph(H0)
-    ETA, BETA, GAMMA = experiment(H0)
+    g_len = xgi.max_edge_order(H0.H)
+    ETA, BETA, GAMMA = experiment(H0, g_len)
     
     pars = {"dataset": data_name, "eta": ETA,  "beta": BETA,  "gamma": GAMMA}
     
-    with open('results/res_{}.pkl'.format(data_name + "_SEM_new"), 'wb') as fp:
+    with open('sem_results_new/res_{}.pkl'.format(data_name + "_SEM_new"), 'wb') as fp:
         pickle.dump(pars, fp, protocol=pickle.HIGHEST_PROTOCOL)
     
 
@@ -88,7 +94,7 @@ def run_bench_mark(data_name):
     
     pars = {"dataset": data_name, "eta": np.mean(ETA),  "beta": np.mean(BETA),  "gamma": np.mean(GAMMA, axis = 0)}
     
-    with open('results/res_{}.json'.format(data_name + "_SEM_new"), 'w') as fp:
+    with open('sem_results_new/res_{}.json'.format(data_name + "_SEM_new"), 'w') as fp:
         json.dump(pars, fp)
     
 
@@ -105,13 +111,14 @@ realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", 
 #run_real_world("email-enron")
 
 # IF YOU WANT TO RUN ALL XGI DATASET IN PARALLEL
-with Pool(len(realworld_Hgraphs)) as p:
-     print(p.map(run_real_world, realworld_Hgraphs))
+
+#with Pool(len(realworld_Hgraphs)) as p:
+#    print(p.map(run_real_world, realworld_Hgraphs))
 
 # +
 # # IF YOU WANT TO RUN THE BENCHMARKING DATASET
 # for data_ in bench_mark:
 #     run_bench_mark(data_)
+# -
 
-# +
-#run_real_world("email-enron")
+run_real_world("ndc-classes")
