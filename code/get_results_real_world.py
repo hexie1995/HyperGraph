@@ -27,11 +27,58 @@ timestamp_dict = dict(zip(realworld_Hgraphs, num_edges))
 
 Gtypes = ["orig", "PA", "ER", "PA_exact", "ER_exact"]
 
+<<<<<<< HEAD
+not_finished = ['coauth-dblp', 'coauth-mag-geology', 'coauth-mag-history', 'dawn', 'disgenenet', 'diseasome', 'tags-stack-overflow', 'threads-stack-overflow']
+
+=======
+>>>>>>> 823e1efe4465706fa14aa38080fcab8b0c715f0a
 
 # +
 def save_output(dataset, timesteps, Gtype):
     
     rk = []
+<<<<<<< HEAD
+    
+
+    for cc in range(timesteps):
+        try:
+
+            if cc%100 == 0 and cc!=0:
+                with open('./simulation/'+ dataset + '_' + Gtype + '_{}.pkl'.format(cc), 'rb') as fp:
+                    r = pickle.load(fp)
+                    
+                i_size = max([x[0] for x in r.keys()])
+                j_size = max([x[1] for x in r.keys()])
+                k_size = max([x[2] for x in r.keys()])
+
+
+                #print(i_size, j_size, k_size) 
+
+                r_ijk = np.zeros(shape=(i_size+1, j_size+1, k_size+1))
+
+                for key in r.keys():
+                    r_ijk[key] = r[key]
+
+                # Transpose the array to bring the first two axes to the end
+                array_transposed = np.transpose(r_ijk, (2, 0, 1))
+                # Apply np.triu along the last two axes
+                upper_triangle_transposed = np.triu(array_transposed)
+                # Transpose the result back to the original shape
+                upper_triangle = np.transpose(upper_triangle_transposed, (1, 2, 0))
+
+
+                normalized_rijk = upper_triangle/np.sum(upper_triangle)
+
+                rk.append(np.sum(normalized_rijk, axis = (0,1)))
+                
+                    
+        except:
+            
+            break
+
+    rk = np.array(rk)
+    np.save('simulation_results_realworld/' + dataset + '_' + Gtype + ".npy", rk)   
+=======
 
     for cc in range(timesteps):
 
@@ -65,6 +112,7 @@ def save_output(dataset, timesteps, Gtype):
         
     rk = np.array(rk)
     np.save('real_simulation/' + dataset + '_' + Gtype + ".npy", rk)   
+>>>>>>> 823e1efe4465706fa14aa38080fcab8b0c715f0a
 
 
 
@@ -76,8 +124,13 @@ def get_results(dataset):
         save_output(dataset, timesteps, g)
 
 
+<<<<<<< HEAD
+for data in not_finished:
+    get_results(data)
+=======
 for data in realworld_Hgraphs:
     try:
         get_results(data)
     except:
         print(data, "not finished")
+>>>>>>> 823e1efe4465706fa14aa38080fcab8b0c715f0a
