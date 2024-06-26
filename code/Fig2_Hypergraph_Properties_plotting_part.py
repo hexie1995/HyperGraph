@@ -15,6 +15,9 @@ import importlib
 import time
 from sod import *
 from scipy.interpolate import make_interp_spline, BSpline
+
+plt.style.use('seaborn-v0_8-whitegrid')
+
 m = importlib.import_module(".model", "src")
 ll = importlib.import_module(".likelihoods", "src")
 
