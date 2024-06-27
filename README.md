@@ -37,15 +37,30 @@ pip install python==3.10.13 xgi==0.8.2
 The above environment has been tested to build successfully and run all the following experiments successfully in both Windows and Linux environments. If support needed for Mac, please report in Issues. 
 
 
-
 </div>
 
 <h2 align="center">Figure Generation Instructions </h2>
 
+Please see `model.py` if you are only interested in using the model. Detailed example usage for generating a synthetic hypergraph can be found in `sem-demo-example-usage.ipynb`
+
+
+</div>
+</div>
+
+<h2 align="center">Figure Generation Instructions </h2>
+
+You can make figures with the makefile. 
+
+```bash
+make fig2 fig3 fig4 fig5
+```
+
+Or you can see below for detailed instructions. 
+
 1. Figure 1 is genereated as a Toy Model via Google Drawing.
 2. Figure 2 is generated via running: a) `Fig2_calculate_properties_cluster_part.py`, b) `Fig2_Hypergraph_Properties_plotting_part.py`. Feel free to check `Fig2-Hypergraph Properties- plotting part.ipynb` for the display of figure.
 3. Figure 3 is generated via running: a) `REAL_WORLD_SEM.py`(note the comments for the difference of generation of real-world xgi datasets and the bio-medical datasets, if run correctly, you should see a folder named `sem_results_new` with results file for each xgi dataset), b) `Fig3-degree-and-size-distributions.py`.
-4. Figure 4 is generated via running: a) `REAL_WORLD_SEM.py` b) `simulation_real_world.py` c) `simulation_real_world_recovered.py` d) `get_results_real_world.py` c)`Fig4_edge_intersection_comparison.py`. (Refer to `Fig4_edge_intersection_comparison.ipynb` was used to generate the colorful version of the plots and `Fig4_edge_intersection_comparison_colorscheme.ipynb` was actually used to generate the plot with monochromatic color schemes.) Note very importantly, `Fig4_edge_intersection_comparison.py` will produce error message for partial datasets that we have not run the `simulation_real_world_recovered.py` for.
+4. Figure 4 is generated via running: a) `REAL_WORLD_SEM.py` b) `simulation_real_world.py` c) `simulation_real_world_recovered.py` d) `get_results_real_world.py` e)`Fig4_edge_intersection_comparison_colorscheme.py`. (Refer to `Fig4_edge_intersection_comparison.ipynb` was used to generate the colorful version of the plots and `Fig4_edge_intersection_comparison_colorscheme.ipynb` was actually used to generate the plot with monochromatic color schemes.) Note very importantly, `Fig4_edge_intersection_comparison.py` will produce error message for partial datasets that we have not run the `simulation_real_world_recovered.py` for.
 5. Figure 5 and Table S1 (with recovered parameters) is generated via running: a) `REAL_WORLD_SEM.py`, b) `Fig5-ScatterPlot-Table1and2.py`. Use `Fig5-ScatterPlot-Table1and2.ipynb` to view the printed table and figure. 
 6. In order to generate AUC scores for all of the XGI datasets/bio-medical datasets, please run `LP-REAL-WORLD.py`(note the comments for the difference of generation of real-world xgi datasets and the bio-medical datasets). After the run completed for both temporal dependent datasets and non-temporal datasets, run `Fig5-ScatterPlot-Table1and2.py` for printing of the link prediction results.
 
