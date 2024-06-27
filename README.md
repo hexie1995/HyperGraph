@@ -47,7 +47,7 @@ Please see `model.py` if you are only interested in using the model. Detailed ex
 </div>
 </div>
 
-<h2 align="center">Figure Generation Instructions </h2>
+<h2 align="center">Model Generation Instructions </h2>
 
 You can make figures with the makefile. 
 
