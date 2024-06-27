@@ -39,7 +39,7 @@ The above environment has been tested to build successfully and run all the foll
 
 </div>
 
-<h2 align="center">Figure Generation Instructions </h2>
+<h2 align="center">Model Instructions </h2>
 
 Please see `model.py` if you are only interested in using the model. Detailed example usage for generating a synthetic hypergraph can be found in `sem-demo-example-usage.ipynb`
 
@@ -47,7 +47,7 @@ Please see `model.py` if you are only interested in using the model. Detailed ex
 </div>
 </div>
 
-<h2 align="center">Model Generation Instructions </h2>
+<h2 align="center">Figure Generation Instructions </h2>
 
 You can make figures with the makefile. 
 
