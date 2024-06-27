@@ -75,8 +75,6 @@ for data in realworld_Hgraphs:
 
         fig.suptitle(data)
 
-        fig.add_subplot(111, frameon=False)
-        # hide tick and tick label of the big axis
 
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc = 'lower center', bbox_to_anchor=(0.5, -0.1), ncol = 8)
