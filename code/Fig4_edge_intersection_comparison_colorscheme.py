@@ -46,7 +46,7 @@ gplot = ["orig", "TECH", "ER", "PA"]
 timesteps = timestamp_dict[data]
 
 
-fig, axes = plt.subplots(nrows= 1, ncols= len(gplot), figsize=(20, 4), sharey=True)
+fig, axes = plt.subplots(nrows= 1, ncols= len(gplot), figsize=(20, 4), sharey=True, layout='constrained')
 
 ksize = []
 for i, ax in enumerate(axes):
@@ -61,10 +61,10 @@ for i, ax in enumerate(axes):
 maxk_ind = ksize.index(max(ksize))
 maxk = max(ksize)
 
-maxk = 10
+maxk = 12
 
 color_map = [(x+1)/(maxk) for x in range(maxk)]
-color_map.reverse()
+#color_map.reverse()
 
 
 
@@ -96,8 +96,8 @@ handles, labels = axes[0].get_legend_handles_labels()
 fig.legend(handles, labels, loc = 'lower center', bbox_to_anchor=(0.5, -0.1), ncol = 8)
 
 plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-plt.xlabel("Probablity of $r_{k}$")
-plt.ylabel("Timesteps")
+fig.supxlabel("Probablity of $r_{k}$")
+fig.supylabel("Timesteps")
 plt.savefig("figures/realworld_intersection/{}_summarize_color.pdf".format(data),  bbox_inches='tight')
 
 
