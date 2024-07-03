@@ -4,14 +4,12 @@
 from functools import cache
 import importlib
 import scipy.special as ss
-import functools
-import xgi
-import math
+
 from collections import Counter, defaultdict
-m = importlib.import_module(".model", "src")
-sem = importlib.import_module(".sem", "src") 
-em = importlib.import_module(".em", "src")
-ll = importlib.import_module(".likelihoods", "src")
+# m = importlib.import_module(".model", "src")
+# sem = importlib.import_module(".sem", "src") 
+# em = importlib.import_module(".em", "src")
+# ll = importlib.import_module(".likelihoods", "src")
 from matplotlib import pyplot as plt
 import numpy as np
 import pickle
