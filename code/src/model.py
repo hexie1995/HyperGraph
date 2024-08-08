@@ -59,8 +59,6 @@ class GrowingHypergraph:
             # then, add unrelated nodes from graph
             num_left   = self.H.num_nodes - len(e)
             num_to_add1 = np.random.choice(len(gamma), 1, p = gamma)[0]
-            #print(num_to_add)
-            #num_to_add = np.random.binomial(num_left, gamma/self.H.num_nodes)
             
             num_added = 0
             
@@ -85,6 +83,107 @@ class GrowingHypergraph:
         
         self.add_edge(e_, log_branch = False)
         return e_
+    
+    
+    
+ 
+    def sample_edge_PA(self, eta, gamma, beta, force_one_node = False):
+        
+        e_PA = set()
+        e_ = set()
+        
+        while len(e_) <= 0:
+            # first, sample existing edge
+            ix = np.random.randint(self.H.num_edges)
+            
+            # if we are tracking the branching process
+            # log that edge about to be formed was formed from edge ix. 
+            if self.track_branching:
+                self.branches.update({self.H.num_edges + 1 : ix})
+            
+            e = self.H.edges.members(ix)
+            
+            if force_one_node: 
+                i = str(np.random.choice(list(e)))
+                e_.add(i)
+            
+            for i in e:
+                if np.random.rand() < eta:
+                    e_.add(str(i))
+            
+            #print(e_)
+            size1 = len(e_)
+            
+            # DIFFERENCES
+            # then, add unrelated nodes from graph
+            num_left   = self.H.num_nodes - len(e)
+            num_to_add1 = np.random.choice(len(gamma), 1, p = gamma)[0]
+            
+            num_added = 0
+            
+            if num_left < num_to_add1:
+                num_to_add1 = num_left
+            
+            
+            
+            while num_added < num_to_add1 and num_to_add1 != 0: 
+                candidate = np.random.randint(0, self.H.num_nodes)
+                # candidate = np.random.choice(self.H.nodes, 1)[0]
+                if candidate not in e:
+                    e_.add(candidate)
+                    num_added += 1
+            
+            
+            size2 = len(e_) - size1 
+            
+            # then, add completely novel nodes
+            
+            num_to_add2 = np.random.choice(len(beta), 1, p = beta)[0]
+            
+            for i in range(self.H.num_nodes, self.H.num_nodes + num_to_add2):
+                e_.add(i)
+            
+            size3 = len(e_) - size2
+        
+        
+        degree_dict = self.H.nodes.degree.asdict()
+        
+        
+        e_dict = {k:degree_dict[k] for k in list(e)}
+        e_nodes, e_dgree = zip(*e_dict.items())
+        
+        e_nodes = list(e_nodes)
+        e_dgree = list(e_dgree)
+        e_prob = [float(x)/sum(e_dgree) for x in e_dgree]
+        
+        diff = set(list(degree_dict.keys())) - e
+        diff_dict = {k:degree_dict[k] for k in list(diff)}
+        diff_nodes, diff_dgree = zip(*diff_dict.items())
+
+        diff_nodes = list(diff_nodes)
+        diff_dgree = list(diff_dgree)
+        diff_prob = [float(x)/sum(diff_dgree) for x in diff_dgree]
+        
+        #print(size1) 
+        #print(e_nodes)
+        
+        to_add1 = np.random.choice(e_nodes, size = size1, replace = False, p = e_prob)        
+        to_add2 = np.random.choice(diff_nodes, size = size2, replace = False, p = diff_prob)  
+        
+        
+        for item in to_add1:
+            e_PA.add(item)
+            
+        for item in to_add2:
+            e_PA.add(item)
+        
+        for i in range(self.H.num_nodes, self.H.num_nodes + size3):
+            e_PA.add(i) 
+        
+        self.add_edge(e_PA, log_branch = False)
+        
+        
+        return e_PA
     
     
     def sample_edge_alternative(self, method, exact, exact_num_nodes, expected_from_graph, expected_new):
