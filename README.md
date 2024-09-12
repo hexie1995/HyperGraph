@@ -15,6 +15,7 @@ The paper is currently in preparation for submission.
 To reproduce all results from our experiments, you will need:
 1. Python 3.10.13
 2. [xgi](https://xgi.readthedocs.io/en/stable/) 0.8.2
+3.  patsy-0.5.6 statsmodels-0.14.2
 You can check these versions respectively with:
 
 ```bash
