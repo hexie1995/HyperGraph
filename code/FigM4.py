@@ -233,7 +233,37 @@ def append_property(HH, HH_r, ASSORT_T2_H, CLUSTER_H, SF_H, FES_H, INTERSECTION_
     
 
 
+def process_intersect(Rmat):
+    rk = []
+    for r in Rmat:
+        
+        #print(r)
 
+        i_size = max([x[0] for x in r.keys()])
+        j_size = max([x[1] for x in r.keys()])
+        k_size = max([x[2] for x in r.keys()])
+
+
+        #print(i_size, j_size, k_size) 
+
+        r_ijk = np.zeros(shape=(i_size+1, j_size+1, k_size+1))
+
+        for key in r.keys():
+            r_ijk[key] = r[key]
+
+        # Transpose the array to bring the first two axes to the end
+        array_transposed = np.transpose(r_ijk, (2, 0, 1))
+        # Apply np.triu along the last two axes
+        upper_triangle_transposed = np.triu(array_transposed)
+        # Transpose the result back to the original shape
+        upper_triangle = np.transpose(upper_triangle_transposed, (1, 2, 0))
+
+
+        normalized_rijk = upper_triangle/np.sum(upper_triangle)
+
+        rk.append(np.sum(normalized_rijk, axis = (0,1)))
+        
+    return rk
 
 def finalize_property(save_name, ASSORT_T2, CLUSTER, SF, FES, INTERSECTION):
     
@@ -246,6 +276,9 @@ def finalize_property(save_name, ASSORT_T2, CLUSTER, SF, FES, INTERSECTION):
     
     with open('fig_backup/res_atu_{}.pkl'.format(save_name), 'wb') as fp:
         pickle.dump(d, fp, protocol=pickle.HIGHEST_PROTOCOL)  
+        
+        
+        
 
 
 # +
