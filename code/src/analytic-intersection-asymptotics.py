@@ -58,9 +58,13 @@ class MatrixConstructor:
         
         # second term (might not need reshaping, but check)
         # THIS IS PROBABLY ANOTHER GOOD PLACE TO CHECK FOR ISSUES WITH THE INTERSECTION SIZES
-        S2_kyljh = hypergeometric(K, L, H, Y)
+        S2_kyljh = hypergeometric(K, Y, H, L)      
 
-
+        # S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
+        # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
+        # S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
+        # print(f"{S2_kyljh.shape =}")
+        
         # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
         S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
         # print(f"{S2_kyljh.shape =}")
@@ -152,6 +156,7 @@ class MatrixConstructor:
             
               
         return (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
+        
        
     def b_array(self): 
         """
@@ -296,10 +301,10 @@ def expectation(x):
     return np.sum(x*np.arange(len(x)))
 
 
-def hypergeometric(num_successes, num_draws, successes_in_pop, total_pop): 
+def hypergeometric(k_success, k, n_success, n): 
     """
     hypergeometric distribution
     """
-    return binom(successes_in_pop, num_successes)*binom(total_pop - successes_in_pop, num_draws - num_successes)/binom(total_pop, num_draws)
+    return binom(n_success, k_success)*binom(n - n_success, k - k_success)/binom(n, k)
     
 
