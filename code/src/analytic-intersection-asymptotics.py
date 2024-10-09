@@ -101,7 +101,29 @@ class MatrixConstructor:
         sparsity = (self.A == 0).mean()
         nan = np.isnan(self.A).mean()
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
+    
+    def omega_array(self): 
         
+        k_max = self.k_max
+        
+        eta   = self.pars["eta"]
+        BETA  = self.pars["beta"]
+        GAMMA = self.pars["gamma"]
+        
+        I = np.arange(k_max)[:, None, None, None, None, None, None]
+        K = np.arange(k_max)[None, :, None, None, None, None, None]
+        L = np.arange(k_max)[None, None, :, None, None, None, None]
+        J = np.arange(k_max)[None, None, None, :, None, None, None]
+        H = np.arange(k_max)[None, None, None, None, :, None, None]
+        S = np.arange(k_max)[None, None, None, None, None, :, None]
+        X = np.arange(k_max)[None, None, None, None, None, None, :]
+        
+        
+        t3_isx = BETA[I - S - X]
+        
+        
+        
+       
     def b_array(self): 
         """
         array of coefficients for first term in the linear map
@@ -161,7 +183,7 @@ class MatrixConstructor:
         
         # case 2: k >= 1
         ## term 1
-        # this term seems to be most influential for the small k = 1 parts
+        # this CREATES intersections FROM other intersections, not from h = 0 cases. 
         to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
@@ -178,6 +200,14 @@ class MatrixConstructor:
             )
         
         S[:,:,1:] += to_add
+        
+        ## term 3 
+        # this USES h = 0 cases in the input tensor in order to create intersections of size k = 1 through the extant node addition mechanism. 
+        
+        # MIGHT be the case that we only need to implement an omega array, and don't need to do anything else in particular to A or B. 
+        
+        
+        
         
         return S
     
