@@ -22,7 +22,7 @@ class GrowingHypergraph:
         self.num_nodes = self.H.num_nodes
         self.num_edges = self.H.num_edges
         self.edges = self.H.edges
-        self._hypergraph = self.H._hypergraph 
+        # self._hypergraph = self.H._hypergraph 
         
         
     def add_edge(self, e, log_branch = True):

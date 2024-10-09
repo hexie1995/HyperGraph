@@ -58,7 +58,9 @@ class MatrixConstructor:
         
         # second term (might not need reshaping, but check)
         # THIS IS PROBABLY ANOTHER GOOD PLACE TO CHECK FOR ISSUES WITH THE INTERSECTION SIZES
-        S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
+        S2_kyljh = hypergeometric(K, L, H, Y)
+
+
         # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
         S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
         # print(f"{S2_kyljh.shape =}")
@@ -103,12 +105,20 @@ class MatrixConstructor:
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
     
     def omega_array(self): 
+        """
+        compute the array omega appearing in the calculation in the supplementary notes
+        definitely worth some review, scrutiny
+        """
         
         k_max = self.k_max
         
         eta   = self.pars["eta"]
         BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
+        
+        mu_BETA = expectation(BETA)
+        mu_GAMMA = expectation(GAMMA)
+        
         
         I = np.arange(k_max)[:, None, None, None, None, None, None]
         K = np.arange(k_max)[None, :, None, None, None, None, None]
@@ -119,10 +129,29 @@ class MatrixConstructor:
         X = np.arange(k_max)[None, None, None, None, None, None, :]
         
         
-        t3_isx = BETA[I - S - X]
+        t1_sljh = binom(J - 1, S - 1)*eta**(S - 1)*(1 - eta)**(J - S)
+        t1_sljh[np.isnan(t1_sljh)] = 0
+        t1_sljh = np.tile(t1_sljh, (k_max, k_max, k_max, 1, k_max, 1, k_max)) 
         
         
+        ix = I - S - X
+        mask = (ix < 0).copy()
+        ix[mask] = 0   # need to mask later to make sure this is correctly NA'd out
+        t3_isx = BETA[ix]
+        t3_isx[mask] = 0
+        t3_isx[np.isnan(t3_isx)] = 0
+        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
         
+        gamma_x = GAMMA[X]
+        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
+        
+
+        w2_ksxljh = hypergeometric(K-1, H, L, S)*X*(J - K + 1)*mu_BETA
+        w2_ksxljh[np.isnan(w2_ksxljh)] = 0
+        w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
+            
+              
+        return (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
        
     def b_array(self): 
         """
@@ -263,4 +292,14 @@ def vec_to_tensor(u, k_max):
 def tensor_to_vec(S, k_max): 
     return S.flatten()
 
+def expectation(x): 
+    return np.sum(x*np.arange(len(x)))
+
+
+def hypergeometric(num_successes, num_draws, successes_in_pop, total_pop): 
+    """
+    hypergeometric distribution
+    """
+    return binom(successes_in_pop, num_successes)*binom(total_pop - successes_in_pop, num_draws - num_successes)/binom(total_pop, num_draws)
+    
 
