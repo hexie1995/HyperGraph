@@ -11,7 +11,12 @@ class MatrixConstructor:
         
         self.a_array()
         self.b_array()
-        
+        self.omega_array()
+    
+    
+    
+    
+    
     def a_array(self):
         """
         probably a pretty inefficient implementation
@@ -108,6 +113,53 @@ class MatrixConstructor:
         nan = np.isnan(self.A).mean()
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
     
+    def a_array_(self):
+        
+        k_max = self.k_max
+        
+        eta   = self.pars["eta"]
+        BETA  = self.pars["beta"]
+        GAMMA = self.pars["gamma"]
+        
+        mu_BETA = expectation(BETA)
+        
+        
+        I = np.arange(k_max)[:, None, None, None, None, None, None]
+        K = np.arange(k_max)[None, :, None, None, None, None, None]
+        L = np.arange(k_max)[None, None, :, None, None, None, None]
+        J = np.arange(k_max)[None, None, None, :, None, None, None]
+        H = np.arange(k_max)[None, None, None, None, :, None, None]
+        S = np.arange(k_max)[None, None, None, None, None, :, None]
+        X = np.arange(k_max)[None, None, None, None, None, None, :]
+        
+        # same t1 as in the omega calculation: should maybe factor out eventually
+        t1_sljh = binom(J - 1, S - 1)*eta**(S - 1)*(1 - eta)**(J - S)
+        t1_sljh[np.isnan(t1_sljh)] = 0
+        t1_sljh = np.tile(t1_sljh, (k_max, k_max, k_max, 1, k_max, 1, k_max)) 
+        
+        w1_kslh = hypergeometric(K, H, L, S)
+        w1_kslh[np.isnan(w1_kslh)] = 0
+        w1_kslh = np.tile(w1_kslh, (k_max, 1, 1, k_max, 1, 1, k_max)) 
+        
+        ix = I - S - X
+        mask = (ix < 0).copy()
+        ix[mask] = 0   # need to mask later to make sure this is correctly NA'd out
+        t3_isx = BETA[ix]
+        t3_isx[mask] = 0
+        t3_isx[np.isnan(t3_isx)] = 0
+        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
+        
+        gamma_x = GAMMA[X]
+        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
+        
+        
+        t3_isx[t3_isx > 0] = 1.0
+        gamma_x[gamma_x > 0] = 1.0
+        
+        # print(w1_kslh.shape)
+        self.A =  (t3_isx*t1_sljh*w1_kslh*gamma_x).sum(axis = (5, 6))
+    
+    
     def omega_array(self): 
         """
         compute the array omega appearing in the calculation in the supplementary notes
@@ -121,7 +173,6 @@ class MatrixConstructor:
         GAMMA = self.pars["gamma"]
         
         mu_BETA = expectation(BETA)
-        mu_GAMMA = expectation(GAMMA)
         
         
         I = np.arange(k_max)[:, None, None, None, None, None, None]
@@ -154,8 +205,7 @@ class MatrixConstructor:
         w2_ksxljh[np.isnan(w2_ksxljh)] = 0
         w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
             
-              
-        return (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
+        self.OMEGA = (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
         
        
     def b_array(self): 
@@ -238,11 +288,17 @@ class MatrixConstructor:
         ## term 3 
         # this USES h = 0 cases in the input tensor in order to create intersections of size k = 1 through the extant node addition mechanism. 
         
-        # MIGHT be the case that we only need to implement an omega array, and don't need to do anything else in particular to A or B. 
+        # this has the expected effect and the eigenvectors look promising. 
+        # might be off by a scalar factor. 
+        # another hypothesis is that this is fine actually but we need to update our calculations for the matrix A. 
         
+        to_add = 1/2*(
+            np.einsum("lj,ikj -> ij", T[1:, :, 0], self.OMEGA[:,1,:,:,0]) + 
+            np.einsum("jl,ikj -> ij", T[:, 1:, 0], self.OMEGA[:,1,:,:,0]) 
+        )
         
-        
-        
+        S[:,:,1] += to_add
+
         return S
     
     def matrix_of_linear_map(self):
