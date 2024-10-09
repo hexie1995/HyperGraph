@@ -36,7 +36,6 @@ class MatrixConstructor:
             S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y + 1))
         
         # this would be a good spot to look for normalization shenanigans.
-        # S1_iy = S1_iy / S1_iy.sum(axis = 0)
         
         # reshape and tile along missing axes
         S1_iy = S1_iy[:, None, None, None, None, :]
@@ -48,7 +47,6 @@ class MatrixConstructor:
         mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
         # S1_iy[mask] = 0
         
-        
         # just for testing 
         sparsity = (S1_iy == 0).mean()
         nan = np.isnan(S1_iy).mean()
@@ -59,6 +57,7 @@ class MatrixConstructor:
         # print(f"{S1_iy.shape =}")
         
         # second term (might not need reshaping, but check)
+        # THIS IS PROBABLY ANOTHER GOOD PLACE TO CHECK FOR ISSUES WITH THE INTERSECTION SIZES
         S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
         # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
         S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
@@ -94,21 +93,10 @@ class MatrixConstructor:
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
         self.S3_yljh = S3_yljh
         
-        
         # marginalize over y
         self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
         
-        self.A_censored = self.A.copy()
-        mask = K > H
-        # print(mask.shape)
-        mask = np.tile(mask, (k_max, 1, k_max, k_max,  1, k_max))
-        # print(mask.shape)
-        self.A_censored[mask[:,:,:,:,:,0]] = 0
         
-        
-        # self.A = 1 + np.zeros_like(self.A) # just for testing
-        
-        # just for testing
         # print("A")
         sparsity = (self.A == 0).mean()
         nan = np.isnan(self.A).mean()
@@ -131,6 +119,7 @@ class MatrixConstructor:
         J = np.arange(k_max)[None, :]
         
         # first term: probability of intersection of size k
+        # THIS would be a good place to check for issues
         M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
         mask = (K > J) | (J == 0) 
         M[mask] = 0
@@ -161,6 +150,9 @@ class MatrixConstructor:
         # case 1: k = 0
         # this CREATES k = 0 cases in the output tensor S
         # it does so by *also* using h = 0 cases in the input tensor T
+        # numerically, this term can play quite a dominant role in the 
+        # spectral structure
+        # this term seems reliable, in the sense that in combination with the third term it captures the density of very large intersections nearly exactly
         to_add = 1/2*(
             np.einsum("lj,ilj -> ij", T[:,:,0], self.A[:,0,:,:,0]) + 
             np.einsum("jl,ijl -> ij", T[:,:,0], self.A[:,0,:,:,0])
@@ -169,7 +161,8 @@ class MatrixConstructor:
         
         # case 2: k >= 1
         ## term 1
-        to_add =  1*(
+        # this term seems to be most influential for the small k = 1 parts
+        to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
         )
@@ -177,6 +170,8 @@ class MatrixConstructor:
         
         ## term 2
         # this USES  h = 0 cases in the input tensor T
+        # this term seems reliable, in the sense that it captures the 
+        # density of very large intersections nearly exactly. 
         to_add = 1*(
             np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
             np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
