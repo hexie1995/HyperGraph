@@ -1,7 +1,8 @@
 # +
 import cProfile
 # cProfile.run("process_real_world_dataset('email-enron')", sort="tottime")
-import importlib 
+import importlib
+import time
 m = importlib.import_module(".model", "src")
 em = importlib.import_module(".em", "src")
 sem = importlib.import_module(".sem", "src") 
@@ -23,55 +24,87 @@ import pickle
 import os
 from itertools import product
 
-def experiment(H, steps = 5000, ax = None, batch_size = 30, verbose = False):
+def experiment(H, g_len, steps = 5000, ax = None, batch_size = 30, verbose = False):
     
-    #if not ax: 
-    #    fig, ax = plt.subplots(1, 1)
-        
+    
+    start = time.time()
+    
+    # use the largest edge size as the starting length for both beta and gamma. 
+    init_pars = {"eta" : 0.5, "beta" : [1/g_len]*g_len, "gamma" : [1/g_len]*g_len}
+    
+    
     EM = sem.SEM(H, 
              ll.guaranteed_edge_sample_likelihood,
              ll.nodes_from_hypergraph_likelihood,
              ll.novel_nodes_likelihood,
-             memoize = False)
+             memoize = False,
+             pars = init_pars.copy())
+    
+    
     # pars = init_pars.copy(), 
+    if steps > 200000:
+        steps = 200000
     
     epochs = int(steps / batch_size)
     
-    ETA   = np.zeros(epochs)
+    ETA   = []
     BETA  = []
     GAMMA = []
+    
+    ADF =[]
+    early_break = None
+    current_eta = 100
 
     # main loop
     for i in range(epochs):
-
-        if i % max(int(epochs/20), 1) == 0 and verbose:
-            print("--------")
-            print(f"Completed epoch {i}")
-            print(EM.pars)
-            
-        EM.SEM_step(0.002*batch_size, batch_size = batch_size) # both the stochastic E and the M steps are in here
-        ETA[i] = EM.pars["eta"]
+        
+        step_size = 1/(100*(i+batch_size+1))
+        
+        if step_size <1e-7:
+            step_size = 1e-7
+        
+        # change the step size at each loop, linear to the steps. 
+        EM.SEM_step(step_size*batch_size, batch_size = batch_size) # both the stochastic E and the M steps are in here
+        ETA.append(EM.pars["eta"])
         BETA.append(EM.pars["beta"])
         GAMMA.append(EM.pars["gamma"])
+        ADF.append(EM.pars["eta"])
+        
+        if i % 100 == 0 and i > 100:
+            print("--------")
+            print(f"calculating last averaged differences")
+            result = np.mean(ADF[-100:])
+            curr_diff = (abs(result - current_eta))/(current_eta)
+            current_eta = EM.pars["eta"]
+            print(curr_diff)
+    
+            if  curr_diff <0.01:
+                T = i*batch_size
+                early_break = True
+                print("Converged after ", T, "steps")
+                break
+        
+    if early_break is None:
+        early_break = False
+        T = steps
+        
+    end = time.time()
+    time_takes = end - start
     
     
-    return ETA, BETA, GAMMA
+    return ETA, BETA, GAMMA, time_takes, T
+
 
 # +
 # The XGI dataset except for disgenenet. 
 realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", "congress-bills", "contact-high-school", 
-                 "contact-primary-school", "dawn", "diseasome", "email-enron", "email-eu", "hospital-lyon",
+                 "contact-primary-school", "dawn", "disgenenet", "diseasome", "email-enron", "email-eu", "hospital-lyon",
                  "hypertext-conference", "invs13", "invs15", "kaggle-whats-cooking", "malawi-village", "ndc-classes",
                  "ndc-substances", "science-gallery", "sfhh-conference","tags-ask-ubuntu", "tags-math-sx" , 
                  "tags-stack-overflow", "threads-ask-ubuntu", "threads-math-sx", "threads-stack-overflow"]
 # Load Benchmarking dataset 
 
 bench_mark = ["iAF1260b", "iJO1366", "uspto"]
-
-nontemporal = ["disgenenet", "hypertext-conference", "invs13", "invs15", 
-               "kaggle-whats-cooking", "malawi-village", "science-gallery", "sfhh-conference"]
-temporal = list(set(realworld_Hgraphs)-set(nontemporal))
-
 
 # -
 
@@ -94,7 +127,7 @@ def generate_negative_samples(H, num):
     return neg_edges
 
 def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 100000, 
-                              randomize = False, use_all_test = False):
+                              randomize = True, use_all_test = False):
 
     # 1. There are multiple ways to to do this, but right now, it is assumed that each edge's probability are calculated independently
     # 2. If a dataset has more than 50k edges, we skip to SEM
@@ -102,6 +135,8 @@ def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 1000
     
     H0 = xgi.load_xgi_data(data_name)
     H0 = m.GrowingHypergraph(H0)
+    g_len = xgi.max_edge_order(H0.H)
+    g_edges = H0.H.num_edges
     longest = max(H0.edges.size.aslist())
 
     total_timesteps = H0.num_edges
@@ -130,6 +165,8 @@ def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 1000
     
     elif randomize:
         
+        print("randomizing")
+        
         H1 = xgi.Hypergraph()
         
         total_edges = list(range(total_timesteps))
@@ -152,7 +189,7 @@ def process_real_world_dataset(data_name, percent_seen = 0.2, num_to_draw = 1000
     to_pred = [list(x) for x in pos_edges] + [list(x) for x in neg_edges]
     true_label = [1]*num_sampled + [0]*num_sampled
     
-    return H0, H1, to_pred, true_label
+    return H0, H1, to_pred, true_label, g_len, g_edges
 
 def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 100000, 
                               randomize = True, use_all_test = True):
@@ -207,26 +244,29 @@ def process_benchmark_dataset(data_name, percent_seen = 0.2, num_to_draw = 10000
 def SEM_link_prediction(data_name, randomize_key, use_only_train = True):
     
     
-#     H0, H1, edges_pred, labels = process_real_world_dataset(data_name, 
-#                                                             percent_seen = 0.2, 
-#                                                             num_to_draw = 100000, 
-#                                                             randomize = randomize_key, 
-#                                                             use_all_test = False)
-
-    H0, H1, edges_pred, labels = process_benchmark_dataset(data_name, 
+    #H0, H1, edges_pred, labels = process_real_world_dataset(data_name)
+    
+    H0, H1, edges_pred, labels, g_len, g_edges = process_real_world_dataset(data_name, 
                                                             percent_seen = 0.2, 
                                                             num_to_draw = 100000, 
                                                             randomize = randomize_key, 
                                                             use_all_test = False)
+
+#     H0, H1, edges_pred, labels = process_benchmark_dataset(data_name, 
+#                                                             percent_seen = 0.5, 
+#                                                             num_to_draw = 100000, 
+#                                                             randomize = randomize_key, 
+#                                                             use_all_test = False)
     
     
     if not use_only_train:
-        with open('results/res_{}.json'.format(data_name + "_SEM")) as f:
+        with open('results/res_CS_{}.json'.format(data_name)) as f:
             PARS = json.loads(f.read())
         del PARS["dataset"]
         
     elif use_only_train:
-        ETA, BETA, GAMMA = experiment(H0)
+        print("using H1 to get parameters")
+        ETA, BETA, GAMMA, time_takes, T= experiment(H0, g_len, 200000, batch_size = 30)
         PARS = {"eta": np.mean(ETA),  "beta": (np.mean(BETA, axis = 0)).tolist(),  "gamma": (np.mean(GAMMA, axis = 0)).tolist()}
         
 
@@ -267,11 +307,11 @@ def expectation(x):
 def SEM_prediction_results(data_, trial):
     
     #data_ = "email-enron"
-    roc_auc, rec_score, f1_ = SEM_link_prediction(data_, randomize_key = False, use_only_train = True)
+    roc_auc, rec_score, f1_ = SEM_link_prediction(data_, randomize_key = True, use_only_train = True)
     D = {"AUC": roc_auc, "recall" : rec_score, "f1": f1_}
     print(D)
     Dir = r"lp_100k_random/"
-    with open(os.path.join(Dir, data_ + '_trainOnly_'+ str(trial)+ '.pkl'), 'wb') as h: pickle.dump(D, h)
+    with open(os.path.join(Dir, data_ + '_CS_'+ str(trial)+ '.pkl'), 'wb') as h: pickle.dump(D, h)
 
 
 # +
@@ -288,35 +328,23 @@ bigger_Hgraphs= ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", "tag
 trials = list(range(10))
 bench_mark = ["iAF1260b", "iJO1366", "uspto"]
 
-to_para = list(product(temporal, trials))
+to_para = list(product(smaller_Hgraphs, trials))
 #SEM_prediction_results(0)
 
+with open("incomplete_random.lst", "rb") as fp:   
+    incomplete = pickle.load(fp)
+to_para = incomplete
 
-# To run the whole xgi datasets for 10 independent trials, uncomment the following. 
-# with Pool(len(to_para)) as p:
-#     print(p.starmap(SEM_prediction_results, to_para))
-# -
 
-# To run the whole data of benchmarking data. Uncomment the block manually to use benchmarking data.
-for d_ in bench_mark:
-    for kk in range(10):
-        SEM_prediction_results(d_, kk)
-
+with Pool(len(to_para)) as p:
+    print(p.starmap(SEM_prediction_results, to_para))
 
 # +
-# Calculate the average AUC and F1 for benchmarking data
-
-# for d_ in bench_mark:
-#     aa = []
-#     ff = []
-#     for kk in range(10):
-#         with open(os.path.join("lp_100k_random/"+ d_ + '_trainOnly_'+ str(kk)+ '.pkl'), 'rb') as f:
-#             PARS = pickle.load(f)
-#         aa.append(PARS["AUC"])
-#         ff.append(PARS["f1"])
-        
-#     print(np.mean(aa))
-#     print(np.mean(ff))
+# with Pool(len(to_para[0:1])) as p:
+#     print(p.starmap(SEM_prediction_results, to_para[0:1]))
 # -
 
-SEM_prediction_results("email-enron", 0)
+# for d_ in bench_mark:
+#     for kk in range(10):
+#         SEM_prediction_results(d_, kk)
+
