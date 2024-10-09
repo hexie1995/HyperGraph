@@ -272,4 +272,4 @@ for i in range(4):
 ax[0].legend() #bbox_to_anchor=(-0.1, 0.7)
 #ax[0].set(ylabel = "Edge intersection rate (normalized)")
 plt.tight_layout()
-plt.savefig("figures/four_property_plot.pdf",bbox_inches='tight')
+plt.savefig("figures/FigM2_four_property_plot.pdf",bbox_inches='tight')
