@@ -9,204 +9,64 @@ class MatrixConstructor:
         self.k_max = k_max
         self.pars = pars
         
-        self.a_array()
         self.b_array()
-        self.omega_array()
+        # self.omega_array()
+        # self.a_array()
+        self.a_and_omega_arrays()
     
+    def a_and_omega_arrays(self):
     
-    
-    
-    
-    def a_array(self):
-        """
-        probably a pretty inefficient implementation
-        attempts to implement alpha from the writeup
-        """
-        
         k_max = self.k_max
-        eta   = self.pars["eta"]
-        BETA  = self.pars["beta"]
-        GAMMA = self.pars["gamma"]
-        
-        I = np.arange(k_max)[:, None, None, None, None, None]
-        K = np.arange(k_max)[None, :, None, None, None, None]
-        L = np.arange(k_max)[None, None, :, None, None, None]
-        J = np.arange(k_max)[None, None, None, :, None, None]
-        H = np.arange(k_max)[None, None, None, None, :, None]
-        Y = np.arange(k_max)[None, None, None, None, None, :]
-        
-        # first term
-        S1_iy = np.zeros((k_max, k_max))
-        for i, y in product(range(k_max), range(k_max)):
-            S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y + 1))
-        
-        # this would be a good spot to look for normalization shenanigans.
-        
-        # reshape and tile along missing axes
-        S1_iy = S1_iy[:, None, None, None, None, :]
-        S1_iy = np.tile(S1_iy, (1, k_max, k_max, k_max, k_max, 1)) 
-        
-
-        # create mask to zero out elements where |e \cap f| > |e|. 
-        mask = Y > I 
-        mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
-        # S1_iy[mask] = 0
-        
-        # just for testing 
-        sparsity = (S1_iy == 0).mean()
-        nan = np.isnan(S1_iy).mean()
-        
-        # print("A components")
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        self.S1_iy = S1_iy
-        # print(f"{S1_iy.shape =}")
-        
-        # second term (might not need reshaping, but check)
-        # THIS IS PROBABLY ANOTHER GOOD PLACE TO CHECK FOR ISSUES WITH THE INTERSECTION SIZES
-        S2_kyljh = hypergeometric(K, Y, H, L)      
-
-        # S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
-        # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
-        # S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
-        # print(f"{S2_kyljh.shape =}")
-        
-        # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
-        S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
-        # print(f"{S2_kyljh.shape =}")
-        
-        # zero out elements where the binomial coefficients are invalid
-        mask = (K > H) | (Y > L) | (Y - K > L - H) | (H > L) | (H > J) | (L == 0) | (J == 0)
-        # print(f"{mask.shape =}")
-        mask = np.tile(mask, (k_max,  1, 1, 1, 1, 1))
-        S2_kyljh[mask] = 0
-        
-        # just for testing
-        sparsity = (S2_kyljh == 0).mean()
-        nan = np.isnan(S2_kyljh).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        
-        self.S2_kyljh = S2_kyljh
-        
-        # third term
-        S3_yljh = binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
-        S3_yljh = np.tile(S3_yljh, (k_max, k_max, 1, k_max, k_max, 1))
-        # print(f"{S3_yljh.shape =}")
-        
-        # need to do some more mask engineering on this term too
-        mask =  (Y > L) | (L == 0)
-        # print(f"{mask.shape =}")
-        mask = np.tile(mask, (k_max,  k_max,1, k_max, k_max, 1))
-        S3_yljh[mask] = 0
-        
-        # just for testing
-        sparsity = (S3_yljh == 0).mean()
-        nan = np.isnan(S3_yljh).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        self.S3_yljh = S3_yljh
-        
-        # marginalize over y
-        self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
-        
-        
-        # print("A")
-        sparsity = (self.A == 0).mean()
-        nan = np.isnan(self.A).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-    
-    def a_array_(self):
-        
-        k_max = self.k_max
-        
         eta   = self.pars["eta"]
         BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
         
         mu_BETA = expectation(BETA)
         
+        # initialize all the array indices
+        I = np.arange(k_max)[:,None,None,None,None,None,None]
+        K = np.arange(k_max)[None,:,None,None,None,None,None]
+        L = np.arange(k_max)[None,None,:,None,None,None,None]
+        J = np.arange(k_max)[None,None,None,:,None,None,None]
+        H = np.arange(k_max)[None,None,None,None,:,None,None]
+        S = np.arange(k_max)[None,None,None,None,None,:,None]
+        X = np.arange(k_max)[None,None,None,None,None,None,:]
         
-        I = np.arange(k_max)[:, None, None, None, None, None, None]
-        K = np.arange(k_max)[None, :, None, None, None, None, None]
-        L = np.arange(k_max)[None, None, :, None, None, None, None]
-        J = np.arange(k_max)[None, None, None, :, None, None, None]
-        H = np.arange(k_max)[None, None, None, None, :, None, None]
-        S = np.arange(k_max)[None, None, None, None, None, :, None]
-        X = np.arange(k_max)[None, None, None, None, None, None, :]
-        
-        # same t1 as in the omega calculation: should maybe factor out eventually
-        t1_sljh = binom(J - 1, S - 1)*eta**(S - 1)*(1 - eta)**(J - S)
+        # used in both arrays
+        # possible issue here: shouldn't we be sampling e from g, which has size L?
+        t1_sljh = binomial(successes = S-1, trials = L-1, prob = eta)
         t1_sljh[np.isnan(t1_sljh)] = 0
-        t1_sljh = np.tile(t1_sljh, (k_max, k_max, k_max, 1, k_max, 1, k_max)) 
+        t1_sljh = np.tile(t1_sljh, (k_max, k_max, 1, k_max, k_max, 1, k_max)) 
+
+        # used in both arrays
+        gamma_x = GAMMA[X]
+        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
         
-        w1_kslh = hypergeometric(K, H, L, S)
+        # used in both arrays
+        ix = I - S - X
+        mask = (ix < 0).copy()
+        ix[mask] = 0   # required for indexing into BETA without error
+                       # need to later go and zero out the results
+        t3_isx = BETA[ix]
+        t3_isx[mask] = 0
+        
+        # now we are ready to tile
+        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
+        
+        # used only in A
+        # hypergeometric(k_success = K, k = Y, n_success = H, n = L)
+        w1_kslh = hypergeometric(k_success = K, k = S, n_success = H, n = L)
         w1_kslh[np.isnan(w1_kslh)] = 0
         w1_kslh = np.tile(w1_kslh, (k_max, 1, 1, k_max, 1, 1, k_max)) 
         
-        ix = I - S - X
-        mask = (ix < 0).copy()
-        ix[mask] = 0   # need to mask later to make sure this is correctly NA'd out
-        t3_isx = BETA[ix]
-        t3_isx[mask] = 0
-        t3_isx[np.isnan(t3_isx)] = 0
-        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
-        
-        gamma_x = GAMMA[X]
-        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
-        
-        
-        t3_isx[t3_isx > 0] = 1.0
-        gamma_x[gamma_x > 0] = 1.0
-        
-        # print(w1_kslh.shape)
-        self.A =  (t3_isx*t1_sljh*w1_kslh*gamma_x).sum(axis = (5, 6))
-    
-    
-    def omega_array(self): 
-        """
-        compute the array omega appearing in the calculation in the supplementary notes
-        definitely worth some review, scrutiny
-        """
-        
-        k_max = self.k_max
-        
-        eta   = self.pars["eta"]
-        BETA  = self.pars["beta"]
-        GAMMA = self.pars["gamma"]
-        
-        mu_BETA = expectation(BETA)
-        
-        
-        I = np.arange(k_max)[:, None, None, None, None, None, None]
-        K = np.arange(k_max)[None, :, None, None, None, None, None]
-        L = np.arange(k_max)[None, None, :, None, None, None, None]
-        J = np.arange(k_max)[None, None, None, :, None, None, None]
-        H = np.arange(k_max)[None, None, None, None, :, None, None]
-        S = np.arange(k_max)[None, None, None, None, None, :, None]
-        X = np.arange(k_max)[None, None, None, None, None, None, :]
-        
-        
-        t1_sljh = binom(J - 1, S - 1)*eta**(S - 1)*(1 - eta)**(J - S)
-        t1_sljh[np.isnan(t1_sljh)] = 0
-        t1_sljh = np.tile(t1_sljh, (k_max, k_max, k_max, 1, k_max, 1, k_max)) 
-        
-        
-        ix = I - S - X
-        mask = (ix < 0).copy()
-        ix[mask] = 0   # need to mask later to make sure this is correctly NA'd out
-        t3_isx = BETA[ix]
-        t3_isx[mask] = 0
-        t3_isx[np.isnan(t3_isx)] = 0
-        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
-        
-        gamma_x = GAMMA[X]
-        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
-        
-
-        w2_ksxljh = hypergeometric(K-1, H, L, S)*X*(J - K + 1)*mu_BETA
+        # used only in OMEGA
+        w2_ksxljh = hypergeometric(k_success = K-1, k = S, n_success = H, n = L)*X*(J - K + 1)*mu_BETA
         w2_ksxljh[np.isnan(w2_ksxljh)] = 0
         w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
-            
-        self.OMEGA = (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
         
+        # store arrays as instance variables
+        self.A     = (t3_isx*gamma_x*w1_kslh  *t1_sljh).sum(axis = (5, 6))
+        self.OMEGA = (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
        
     def b_array(self): 
         """
@@ -356,11 +216,11 @@ def tensor_to_vec(S, k_max):
 def expectation(x): 
     return np.sum(x*np.arange(len(x)))
 
-
 def hypergeometric(k_success, k, n_success, n): 
     """
     hypergeometric distribution
     """
     return binom(n_success, k_success)*binom(n - n_success, k - k_success)/binom(n, k)
     
-
+def binomial(successes, trials, prob):
+    return binom(trials, successes)*prob**(successes)*(1 - prob)**(trials - successes)    
