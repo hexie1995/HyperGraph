@@ -21,6 +21,8 @@ sem = importlib.import_module(".sem", "src")
 em = importlib.import_module(".em", "src")
 ll = importlib.import_module(".likelihoods", "src")
 
+plt.style.use("seaborn-v0_8-whitegrid")
+plt.rcParams["font.family"] = "Lato"
 
 
 def reindex_hypergraph_xgi(H):
@@ -219,7 +221,7 @@ def append_property(HH, HH_r, ASSORT_T2_H, CLUSTER_H, SF_H, FES_H, INTERSECTION_
     
     max_order = 10
     min_size= 2
-    ASSORT_T2_H.append(xgi.degree_assortativity(HH.H, exact = True))
+    ASSORT_T2_H.append(xgi.degree_assortativity(HH.H))
     CLUSTER_H.append(np.mean(list(xgi.clustering_coefficient(HH.H).values())))
     
     G = xgi.subhypergraph(HH.H, edges=HH.H.edges.filterby("order", max_order, "leq")).copy()
@@ -289,23 +291,29 @@ data_name = "email-enron"
 create_HG_rijk(data_name)
 
 
-properties = [ "Assortativity_Top2", "Clustering Coefficient", "Edit Simpliciality",  "Intersection Sizes"]
+properties = [ "Assortativity", "Clustering Coefficient", "Edit Simpliciality",  "Intersection Sizes"]
 idx = ["assort_t2", "cluster", "SF",  "INTERSECTION"]
 fig, ax = plt.subplots(1, 4, figsize = (12, 3), sharey= False)
 ax = ax.flatten()
-inferno = ["sandybrown", "gray", "cornflowerblue", "palevioletred", 
-          "sandybrown", "gray", "cornflowerblue", "palevioletred", ]                                   
+inferno = [ "gray","sandybrown", "cornflowerblue", "palevioletred", 
+           "gray","sandybrown", "cornflowerblue", "palevioletred", ]                                   
                                         
 timeline = [x*100 for x in range(1, 101)]
 
-suffix = ["", "_OG", "_PA", "_ER"]
-labb = ["HCM", "Orig", "PA", "ER"]
+#suffix = ["", "_OG", "_PA", "_ER"]
+#labb = ["HCM", "Orig", "PA", "ER"]
 
+suffix = ["_OG", "", "_PA", "_ER"]
+labb = ["Data", "HCM", "PA", "ER"]
 
 
 for i in range(4):
     property_ = properties[i]
     print(property_)
+    
+    if property_ == "Edit Simpliciality":
+        ax[i].set_ylim([0.0, 0.15])
+    
     #ax[i].loglog()
     ax[i].set(title = f"{property_}")
     ax[i].set(xlabel = "Timestep")
