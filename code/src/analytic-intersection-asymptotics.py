@@ -9,111 +9,65 @@ class MatrixConstructor:
         self.k_max = k_max
         self.pars = pars
         
-        self.a_array()
         self.b_array()
-        
-    def a_array(self):
-        """
-        probably a pretty inefficient implementation
-        attempts to implement alpha from the writeup
-        """
-        
+        # self.omega_array()
+        # self.a_array()
+        self.a_and_omega_arrays()
+    
+    def a_and_omega_arrays(self):
+    
         k_max = self.k_max
         eta   = self.pars["eta"]
         BETA  = self.pars["beta"]
         GAMMA = self.pars["gamma"]
         
-        I = np.arange(k_max)[:, None, None, None, None, None]
-        K = np.arange(k_max)[None, :, None, None, None, None]
-        L = np.arange(k_max)[None, None, :, None, None, None]
-        J = np.arange(k_max)[None, None, None, :, None, None]
-        H = np.arange(k_max)[None, None, None, None, :, None]
-        Y = np.arange(k_max)[None, None, None, None, None, :]
+        mu_BETA = expectation(BETA)
         
-        # first term
-        S1_iy = np.zeros((k_max, k_max))
-        for i, y in product(range(k_max), range(k_max)):
-            S1_iy[i, y] = sum(BETA[x]*GAMMA[i - y - x] for x in range(0, i - y + 1))
+        # initialize all the array indices
+        I = np.arange(k_max)[:,None,None,None,None,None,None]
+        K = np.arange(k_max)[None,:,None,None,None,None,None]
+        L = np.arange(k_max)[None,None,:,None,None,None,None]
+        J = np.arange(k_max)[None,None,None,:,None,None,None]
+        H = np.arange(k_max)[None,None,None,None,:,None,None]
+        S = np.arange(k_max)[None,None,None,None,None,:,None]
+        X = np.arange(k_max)[None,None,None,None,None,None,:]
         
-        # this would be a good spot to look for normalization shenanigans.
-        # S1_iy = S1_iy / S1_iy.sum(axis = 0)
-        
-        # reshape and tile along missing axes
-        S1_iy = S1_iy[:, None, None, None, None, :]
-        S1_iy = np.tile(S1_iy, (1, k_max, k_max, k_max, k_max, 1)) 
-        
+        # used in both arrays
+        # possible issue here: shouldn't we be sampling e from g, which has size L?
+        t1_sljh = binomial(successes = S-1, trials = L-1, prob = eta)
+        t1_sljh[np.isnan(t1_sljh)] = 0
+        t1_sljh = np.tile(t1_sljh, (k_max, k_max, 1, k_max, k_max, 1, k_max)) 
 
-        # create mask to zero out elements where |e \cap f| > |e|. 
-        mask = Y > I 
-        mask = np.tile(mask, (1, k_max, k_max, k_max, k_max, 1))
-        # S1_iy[mask] = 0
+        # used in both arrays
+        gamma_x = GAMMA[X]
+        gamma_x = np.tile(gamma_x, (k_max, k_max, k_max, k_max, k_max, k_max, 1))
         
+        # used in both arrays
+        ix = I - S - X
+        mask = (ix < 0).copy()
+        ix[mask] = 0   # required for indexing into BETA without error
+                       # need to later go and zero out the results
+        t3_isx = BETA[ix]
+        t3_isx[mask] = 0
         
-        # just for testing 
-        sparsity = (S1_iy == 0).mean()
-        nan = np.isnan(S1_iy).mean()
+        # now we are ready to tile
+        t3_isx = np.tile(t3_isx, (1, k_max, k_max, k_max, k_max, 1, 1))
         
-        # print("A components")
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        self.S1_iy = S1_iy
-        # print(f"{S1_iy.shape =}")
+        # used only in A
+        # hypergeometric(k_success = K, k = Y, n_success = H, n = L)
+        w1_kslh = hypergeometric(k_success = K, k = S, n_success = H, n = L)
+        w1_kslh[np.isnan(w1_kslh)] = 0
+        w1_kslh = np.tile(w1_kslh, (k_max, 1, 1, k_max, 1, 1, k_max)) 
         
-        # second term (might not need reshaping, but check)
-        S2_kyljh = binom(H, K)*binom(L - H, Y - K)/binom(L, Y)
-        # S2_kyljh = S2_kyljh[None, None, :, :, :, :]
-        S2_kyljh = np.tile(S2_kyljh, (k_max,  1, 1, k_max, 1, 1))
-        # print(f"{S2_kyljh.shape =}")
+        # used only in OMEGA
+        w2_ksxljh = hypergeometric(k_success = K-1, k = S, n_success = H, n = L)*X*(J - K + 1)*mu_BETA
+        w2_ksxljh[np.isnan(w2_ksxljh)] = 0
+        w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
         
-        # zero out elements where the binomial coefficients are invalid
-        mask = (K > H) | (Y > L) | (Y - K > L - H) | (H > L) | (H > J) | (L == 0) | (J == 0)
-        # print(f"{mask.shape =}")
-        mask = np.tile(mask, (k_max,  1, 1, 1, 1, 1))
-        S2_kyljh[mask] = 0
-        
-        # just for testing
-        sparsity = (S2_kyljh == 0).mean()
-        nan = np.isnan(S2_kyljh).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        
-        self.S2_kyljh = S2_kyljh
-        
-        # third term
-        S3_yljh = binom(L-1, Y-1) * eta**(Y-1) * (1-eta)**(L-Y)
-        S3_yljh = np.tile(S3_yljh, (k_max, k_max, 1, k_max, k_max, 1))
-        # print(f"{S3_yljh.shape =}")
-        
-        # need to do some more mask engineering on this term too
-        mask =  (Y > L) | (L == 0)
-        # print(f"{mask.shape =}")
-        mask = np.tile(mask, (k_max,  k_max,1, k_max, k_max, 1))
-        S3_yljh[mask] = 0
-        
-        # just for testing
-        sparsity = (S3_yljh == 0).mean()
-        nan = np.isnan(S3_yljh).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        self.S3_yljh = S3_yljh
-        
-        
-        # marginalize over y
-        self.A = (S1_iy*S2_kyljh*S3_yljh).sum(axis = 5)
-        
-        self.A_censored = self.A.copy()
-        mask = K > H
-        # print(mask.shape)
-        mask = np.tile(mask, (k_max, 1, k_max, k_max,  1, k_max))
-        # print(mask.shape)
-        self.A_censored[mask[:,:,:,:,:,0]] = 0
-        
-        
-        # self.A = 1 + np.zeros_like(self.A) # just for testing
-        
-        # just for testing
-        # print("A")
-        sparsity = (self.A == 0).mean()
-        nan = np.isnan(self.A).mean()
-        # print(f"{sparsity = :.4f}, {nan = :.4f}")
-        
+        # store arrays as instance variables
+        self.A     = (t3_isx*gamma_x*w1_kslh  *t1_sljh).sum(axis = (5, 6))
+        self.OMEGA = (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
+       
     def b_array(self): 
         """
         array of coefficients for first term in the linear map
@@ -131,6 +85,7 @@ class MatrixConstructor:
         J = np.arange(k_max)[None, :]
         
         # first term: probability of intersection of size k
+        # THIS would be a good place to check for issues
         M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
         mask = (K > J) | (J == 0) 
         M[mask] = 0
@@ -161,6 +116,9 @@ class MatrixConstructor:
         # case 1: k = 0
         # this CREATES k = 0 cases in the output tensor S
         # it does so by *also* using h = 0 cases in the input tensor T
+        # numerically, this term can play quite a dominant role in the 
+        # spectral structure
+        # this term seems reliable, in the sense that in combination with the third term it captures the density of very large intersections nearly exactly
         to_add = 1/2*(
             np.einsum("lj,ilj -> ij", T[:,:,0], self.A[:,0,:,:,0]) + 
             np.einsum("jl,ijl -> ij", T[:,:,0], self.A[:,0,:,:,0])
@@ -169,7 +127,8 @@ class MatrixConstructor:
         
         # case 2: k >= 1
         ## term 1
-        to_add =  1*(
+        # this CREATES intersections FROM other intersections, not from h = 0 cases. 
+        to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
         )
@@ -177,6 +136,8 @@ class MatrixConstructor:
         
         ## term 2
         # this USES  h = 0 cases in the input tensor T
+        # this term seems reliable, in the sense that it captures the 
+        # density of very large intersections nearly exactly. 
         to_add = 1*(
             np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
             np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
@@ -184,6 +145,20 @@ class MatrixConstructor:
         
         S[:,:,1:] += to_add
         
+        ## term 3 
+        # this USES h = 0 cases in the input tensor in order to create intersections of size k = 1 through the extant node addition mechanism. 
+        
+        # this has the expected effect and the eigenvectors look promising. 
+        # might be off by a scalar factor. 
+        # another hypothesis is that this is fine actually but we need to update our calculations for the matrix A. 
+        
+        to_add = 1/2*(
+            np.einsum("lj,ikj -> ij", T[1:, :, 0], self.OMEGA[:,1,:,:,0]) + 
+            np.einsum("jl,ikj -> ij", T[:, 1:, 0], self.OMEGA[:,1,:,:,0]) 
+        )
+        
+        S[:,:,1] += to_add
+
         return S
     
     def matrix_of_linear_map(self):
@@ -238,4 +213,14 @@ def vec_to_tensor(u, k_max):
 def tensor_to_vec(S, k_max): 
     return S.flatten()
 
+def expectation(x): 
+    return np.sum(x*np.arange(len(x)))
 
+def hypergeometric(k_success, k, n_success, n): 
+    """
+    hypergeometric distribution
+    """
+    return binom(n_success, k_success)*binom(n - n_success, k - k_success)/binom(n, k)
+    
+def binomial(successes, trials, prob):
+    return binom(trials, successes)*prob**(successes)*(1 - prob)**(trials - successes)    
