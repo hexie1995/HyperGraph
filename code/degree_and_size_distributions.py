@@ -286,15 +286,17 @@ def asymptotic_edge_size_distribution(*args, **kwargs):
 #     except:
 #         print("not finished yet")
 
-make_fig([
-            "email-enron",
-            # "email-enron",
-            "ndc-classes", 
-            "coauth-mag-history", 
-            "tags-ask-ubuntu"
-        ], 
-        fname = "multi-distribution-fig", 
-        show_analytic=False)
+if __name__ == "__main__":
+
+    make_fig([
+                "email-enron",
+                # "email-enron",
+                "ndc-classes", 
+                "coauth-mag-history", 
+                "tags-ask-ubuntu"
+            ], 
+            fname = "multi-distribution-fig", 
+            show_analytic=False)
 
     
 # make_fig("email-enron")

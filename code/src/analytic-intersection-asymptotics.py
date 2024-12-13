@@ -33,7 +33,7 @@ class MatrixConstructor:
         X = np.arange(k_max)[None,None,None,None,None,None,:]
         
         # used in both arrays
-        # possible issue here: shouldn't we be sampling e from g, which has size L?
+        
         t1_sljh = binomial(successes = S-1, trials = L-1, prob = eta)
         t1_sljh[np.isnan(t1_sljh)] = 0
         t1_sljh = np.tile(t1_sljh, (k_max, k_max, 1, k_max, k_max, 1, k_max)) 
@@ -65,7 +65,11 @@ class MatrixConstructor:
         w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
         
         # store arrays as instance variables
-        self.A     = (t3_isx*gamma_x*w1_kslh  *t1_sljh).sum(axis = (5, 6))
+        
+        # labeled phi in the writeup
+        self.A     = (t3_isx*gamma_x*w1_kslh*t1_sljh).sum(axis = (5, 6))
+                
+        # labeled psi in the writeup
         self.OMEGA = (t3_isx*gamma_x*w2_ksxljh*t1_sljh).sum(axis = (5, 6))
        
     def b_array(self): 
@@ -93,6 +97,7 @@ class MatrixConstructor:
         
         # second term: probability of edge of size i given intersection of size k
         
+        # any way we introduce some double counting here or below?
         N = np.zeros((k_max, k_max))
         for i, k in product(range(1, k_max), range(k_max)):
             N[i, k] = sum(
@@ -103,9 +108,6 @@ class MatrixConstructor:
         for i, k, j in product(range(k_max), range(k_max), range(k_max)):
             self.B[i,k,j] = M[k,j] * N[i,k]
         
-        # print("B")
-        sparsity = (self.B == 0).mean()
-        nan = np.isnan(self.B).mean()
         
         # print(f"{sparsity = :.4f}, {nan = :.4f}")
         
@@ -119,6 +121,8 @@ class MatrixConstructor:
         # numerically, this term can play quite a dominant role in the 
         # spectral structure
         # this term seems reliable, in the sense that in combination with the third term it captures the density of very large intersections nearly exactly
+        
+        # eq. 75 in current draft
         to_add = 1/2*(
             np.einsum("lj,ilj -> ij", T[:,:,0], self.A[:,0,:,:,0]) + 
             np.einsum("jl,ijl -> ij", T[:,:,0], self.A[:,0,:,:,0])
@@ -128,6 +132,7 @@ class MatrixConstructor:
         # case 2: k >= 1
         ## term 1
         # this CREATES intersections FROM other intersections, not from h = 0 cases. 
+        # Final term in eqs. 79/80 in current draft
         to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
@@ -138,6 +143,12 @@ class MatrixConstructor:
         # this USES  h = 0 cases in the input tensor T
         # this term seems reliable, in the sense that it captures the 
         # density of very large intersections nearly exactly. 
+        # this is the term for which the factor of 1/2 is in question
+        # both with and without this factor, we replicate the distribution 
+        # of edge sizes very precisely.
+        # with the factor of 1/2, we are off by roughly a factor of 2 in the tail of the distribution.
+        
+        # eq. 79/80, first term (with b_{ik|j})
         to_add = 1*(
             np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
             np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
@@ -148,13 +159,10 @@ class MatrixConstructor:
         ## term 3 
         # this USES h = 0 cases in the input tensor in order to create intersections of size k = 1 through the extant node addition mechanism. 
         
-        # this has the expected effect and the eigenvectors look promising. 
-        # might be off by a scalar factor. 
-        # another hypothesis is that this is fine actually but we need to update our calculations for the matrix A. 
-        
+        # eq. 79, 2nd term in current draft
         to_add = 1/2*(
-            np.einsum("lj,ikj -> ij", T[1:, :, 0], self.OMEGA[:,1,:,:,0]) + 
-            np.einsum("jl,ikj -> ij", T[:, 1:, 0], self.OMEGA[:,1,:,:,0]) 
+            np.einsum("lj,ikj -> ij", T[1:,  :, 0], self.OMEGA[:,1,:,:,0]) + 
+            np.einsum("jl,ikj -> ij", T[ :, 1:, 0], self.OMEGA[:,1,:,:,0]) 
         )
         
         S[:,:,1] += to_add
