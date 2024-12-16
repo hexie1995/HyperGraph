@@ -400,19 +400,14 @@ class GrowingHypergraph:
         """
         """
         
-        
         e = self.H.edges.members(eid)
-        set0 = set(e)
         neighbor_edges = []
-        
-        
         
         for i in e: 
             for eid_ in self.H.nodes.memberships(i):
-                if ((not prior_only) or (eid_ <= eid)) and (eid_ != eid): 
+                if ((not prior_only) or (eid_ < eid)) and (eid_ != eid): 
                     neighbor_edges.append(eid_)
 
-        
         neighbor_edges = set(neighbor_edges)
         if as_node_sets: 
             return [self.H.edges.members(eid_) for eid_ in neighbor_edges]

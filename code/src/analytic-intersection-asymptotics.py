@@ -90,7 +90,7 @@ class MatrixConstructor:
         
         # first term: probability of intersection of size k
         # THIS would be a good place to check for issues
-        M = binom(J-1, K-1)*eta**(K-1)*(1-eta)**(J-K) 
+        M = binomial(successes = K-1, trials = J-1, prob = eta)
         mask = (K > J) | (J == 0) 
         M[mask] = 0
         # self.M = M
@@ -99,10 +99,10 @@ class MatrixConstructor:
         
         # any way we introduce some double counting here or below?
         N = np.zeros((k_max, k_max))
-        for i, k in product(range(1, k_max), range(k_max)):
+        for i, k in product(range(1, k_max), range(1, k_max)):
             N[i, k] = sum(
-                BETA[ell]*GAMMA[i-k-ell]
-                for ell in range(0, i - k + 1)
+                BETA[x]*GAMMA[i-k-x]
+                for x in range(0, i - k + 1)
             )
         
         for i, k, j in product(range(k_max), range(k_max), range(k_max)):
@@ -121,6 +121,7 @@ class MatrixConstructor:
         # numerically, this term can play quite a dominant role in the 
         # spectral structure
         # this term seems reliable, in the sense that in combination with the third term it captures the density of very large intersections nearly exactly
+        # NOTE: adding a factor of 1 (instead of 1/2) here does change the eigenvalue of the matrix
         
         # eq. 75 in current draft
         to_add = 1/2*(
@@ -133,6 +134,7 @@ class MatrixConstructor:
         ## term 1
         # this CREATES intersections FROM other intersections, not from h = 0 cases. 
         # Final term in eqs. 79/80 in current draft
+        # NOTE: adding a factor of 1 (instead of 1/2) here does change the eigenvalue of the matrix
         to_add =  1/2*(
             np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
             np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
@@ -149,17 +151,23 @@ class MatrixConstructor:
         # with the factor of 1/2, we are off by roughly a factor of 2 in the tail of the distribution.
         
         # eq. 79/80, first term (with b_{ik|j})
-        to_add = 1*(
-            np.einsum("lj,ikj -> ijk", T[1:,  :, 0], self.B[:,1:,:]) +
-            np.einsum("jl,ikj -> ijk", T[ :, 1:, 0], self.B[:,1:,:])
+        
+        # print(f"{self.B[:,1:,:].shape=}")
+        # print(f"{T[1:,:,0].shape=}")
+            
+        to_add = 1/2*(
+            np.einsum("lj,ikj -> ijk", T[1:, 1:, 0], self.B[1:,1:,1:]) +
+            np.einsum("jl,ikj -> ijk", T[1:, 1:, 0], self.B[1:,1:,1:])
             )
         
-        S[:,:,1:] += to_add
+        S[1:,1:,1:] += to_add
         
         ## term 3 
         # this USES h = 0 cases in the input tensor in order to create intersections of size k = 1 through the extant node addition mechanism. 
         
         # eq. 79, 2nd term in current draft
+        
+        # NOTE: adding a factor of 1 (instead of 1/2) here does NOT seem to change the eigenvalue of the matrix
         to_add = 1/2*(
             np.einsum("lj,ikj -> ij", T[1:,  :, 0], self.OMEGA[:,1,:,:,0]) + 
             np.einsum("jl,ikj -> ij", T[ :, 1:, 0], self.OMEGA[:,1,:,:,0]) 
@@ -182,6 +190,7 @@ class MatrixConstructor:
             T = vec_to_tensor(u, k_max)
             S = self.linear_map(T)
             v = tensor_to_vec(S, k_max)
+            
             M[:, i] = v
 
         return M
