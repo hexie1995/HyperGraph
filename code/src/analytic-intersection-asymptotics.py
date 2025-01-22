@@ -34,9 +34,12 @@ class MatrixConstructor:
         
         # used in both arrays
         
+        # note: although indexed sljh, it is correct for this not to depend on h
+        
         t1_sljh = binomial(successes = S-1, trials = L-1, prob = eta)
         t1_sljh[np.isnan(t1_sljh)] = 0
         t1_sljh = np.tile(t1_sljh, (k_max, k_max, 1, k_max, k_max, 1, k_max)) 
+
 
         # used in both arrays
         gamma_x = GAMMA[X]
@@ -55,14 +58,21 @@ class MatrixConstructor:
         
         # used only in A
         # hypergeometric(k_success = K, k = Y, n_success = H, n = L)
+        #  note: need to zero out the case that K > J
         w1_kslh = hypergeometric(k_success = K, k = S, n_success = H, n = L)
         w1_kslh[np.isnan(w1_kslh)] = 0
         w1_kslh = np.tile(w1_kslh, (k_max, 1, 1, k_max, 1, 1, k_max)) 
+        mask = np.tile(K > J, (k_max, 1, k_max, 1,  k_max, k_max, k_max))
+        w1_kslh[mask] = 0
+        mask = np.tile(H > J, (k_max, k_max, k_max, 1,  1, k_max, k_max))
+        w1_kslh[mask] = 0
         
         # used only in OMEGA
         w2_ksxljh = hypergeometric(k_success = K-1, k = S, n_success = H, n = L)*X*(J - K + 1)*mu_BETA
         w2_ksxljh[np.isnan(w2_ksxljh)] = 0
         w2_ksxljh = np.tile(w2_ksxljh, (k_max, 1, 1, 1, 1, 1, 1))
+        mask = np.tile(K > J + 1, (k_max, 1, k_max, 1, k_max, k_max, k_max))
+        w2_ksxljh[mask] = 0
         
         # store arrays as instance variables
         
@@ -123,23 +133,30 @@ class MatrixConstructor:
         # this term seems reliable, in the sense that in combination with the third term it captures the density of very large intersections nearly exactly
         # NOTE: adding a factor of 1 (instead of 1/2) here does change the eigenvalue of the matrix
         
-        # eq. 75 in current draft
+        # eq. 81 in current draft
+        
+        # empirically   correct coef: 1/2
+        # theoretically correct coef: 1/2
         to_add = 1/2*(
-            np.einsum("lj,ilj -> ij", T[:,:,0], self.A[:,0,:,:,0]) + 
-            np.einsum("jl,ijl -> ij", T[:,:,0], self.A[:,0,:,:,0])
+            np.einsum("lj,ilj -> ij", T[1:,1:,0], self.A[1:,0,1:,1:,0]) + 
+            np.einsum("jl,ijl -> ij", T[1:,1:,0], self.A[1:,0,1:,1:,0])
         )
-        S[:,:,0] = to_add
+        S[1:,1:,0] = to_add
         
         # case 2: k >= 1
         ## term 1
         # this CREATES intersections FROM other intersections, not from h = 0 cases. 
-        # Final term in eqs. 79/80 in current draft
-        # NOTE: adding a factor of 1 (instead of 1/2) here does change the eigenvalue of the matrix
-        to_add =  1/2*(
-            np.einsum("ljh,ikljh -> ijk", T, self.A[:,1:,:,:,:]) + 
-            np.einsum("jlh,ikjlh -> ijk", T, self.A[:,1:,:,:,:])
+        # "intersection decay"
+        
+        # Should have a coefficient of 1 in front of it using the arguments in the current draft...? So now we need to justify the presence of the 1/2 here. 
+        
+        # empirically   correct coef: 1/2? 1?
+        # theoretically correct coef: 1
+        to_add = 1*(
+            np.einsum("ljh,ikljh -> ijk", T[1:,1:,:], self.A[1:,1:,1:,1:,:]) + 
+            np.einsum("jlh,ikjlh -> ijk", T[1:,1:,:], self.A[1:,1:,1:,1:,:])
         )
-        S[:,:,1:] += to_add
+        S[1:,1:,1:] += to_add
         
         ## term 2
         # this USES  h = 0 cases in the input tensor T
@@ -152,10 +169,9 @@ class MatrixConstructor:
         
         # eq. 79/80, first term (with b_{ik|j})
         
-        # print(f"{self.B[:,1:,:].shape=}")
-        # print(f"{T[1:,:,0].shape=}")
-            
-        to_add = 1/2*(
+        # empirically   correct coef: 1
+        # theoretically correct coef: 1
+        to_add = 1*(
             np.einsum("lj,ikj -> ijk", T[1:, 1:, 0], self.B[1:,1:,1:]) +
             np.einsum("jl,ikj -> ijk", T[1:, 1:, 0], self.B[1:,1:,1:])
             )
@@ -167,13 +183,16 @@ class MatrixConstructor:
         
         # eq. 79, 2nd term in current draft
         
-        # NOTE: adding a factor of 1 (instead of 1/2) here does NOT seem to change the eigenvalue of the matrix
-        to_add = 1/2*(
-            np.einsum("lj,ikj -> ij", T[1:,  :, 0], self.OMEGA[:,1,:,:,0]) + 
-            np.einsum("jl,ikj -> ij", T[ :, 1:, 0], self.OMEGA[:,1,:,:,0]) 
+        # empirically   correct coef: 1/2
+        # theoretically correct coef: 1
+        
+        # OMEGA is indexed ik|ljh
+        to_add = 1*(
+            np.einsum("lj,ilj -> ij", T[1:, 1:, 0], self.OMEGA[1:,1,1:,1:,0]) + 
+            np.einsum("jl,ijl -> ij", T[1:, 1:, 0], self.OMEGA[1:,1,1:,1:,0]) 
         )
         
-        S[:,:,1] += to_add
+        S[1:,1:,1] += to_add
 
         return S
     
