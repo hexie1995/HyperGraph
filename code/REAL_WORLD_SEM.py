@@ -22,7 +22,12 @@ import os
 import pickle
 import time
 
+def create_directory_if_not_exists(path):
+    os.makedirs(path, exist_ok=True)
 
+# Create results folder if not-exists
+directory_path = "sem_results"
+create_directory_if_not_exists(directory_path)
 
 # track the parameter estimates over time
 
@@ -139,9 +144,9 @@ realworld_Hgraphs = ["coauth-dblp", "coauth-mag-geology", "coauth-mag-history", 
                  "tags-stack-overflow", "threads-ask-ubuntu", "threads-math-sx", "threads-stack-overflow"]
 
 # IF YOU WANT TO ONLY RUN ONE DATASET
-#run_real_world("email-enron")
+run_real_world("email-enron")
 
 # IF YOU WANT TO RUN ALL XGI DATASET IN PARALLEL
 
-with Pool(len(realworld_Hgraphs)) as p:
-    print(p.map(run_real_world, realworld_Hgraphs))
+#with Pool(len(realworld_Hgraphs)) as p:
+#    print(p.map(run_real_world, realworld_Hgraphs))
