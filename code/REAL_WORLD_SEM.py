@@ -115,7 +115,7 @@ def run_real_world(data_name):
     
     pars = {"dataset": data_name, "time": time_takes, "converge": T, "eta": ETA,  "beta": BETA,  "gamma": GAMMA}
     
-    with open('sem_results/res_CS1_{}.pkl'.format(data_name), 'wb') as fp:
+    with open('sem_results/res_{}.pkl'.format(data_name), 'wb') as fp:
         pickle.dump(pars, fp, protocol=pickle.HIGHEST_PROTOCOL)
     
 
@@ -130,7 +130,7 @@ def run_bench_mark(data_name):
     
     pars = {"dataset": data_name, "eta": np.mean(ETA),  "beta": np.mean(BETA),  "gamma": np.mean(GAMMA, axis = 0)}
     
-    with open('sem_results_new/res_{}.json'.format(data_name + "_SEM_new"), 'w') as fp:
+    with open('sem_results_new/res_{}.json'.format(data_name), 'w') as fp:
         json.dump(pars, fp)
     
 
