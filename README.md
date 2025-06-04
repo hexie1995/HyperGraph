@@ -46,18 +46,6 @@ Please see `model.py` if you are only interested in using the model. Detailed ex
 
 
 </div>
-</div>
-
-<h2 align="center">Figure Generation Instructions </h2>
-
-You can make figures with the makefile. 
-
-```bash
-make fig2 fig3 fig4 fig5
-```
-
-
-</div>
 
 </div>
 
@@ -66,3 +54,27 @@ make fig2 fig3 fig4 fig5
 See `stochastic-em-demo_TOPK.ipynb` for how to generate synthetic hypergraph and get the recovered parameters. Sepcific comments in the file. 
 
 </div>
+
+</div>
+
+<h2 align="center">Detailed Replication Instructions </h2>
+
+You can make figures easily by running the python scripts provided for each of them, e.g.:
+
+1. For Main Paper Fig 3.
+```bash
+python MFig3.py
+```
+2. For Supplementary Figure 8.
+```bash
+python SFig8.py
+```
+Note, VERY IMPORTANTLY, you will need to run the following two files if you want to generate many of the figures here because of dependency. 
+```bash
+python REAL_WORLD_SEM.py
+```
+```bash
+python MTab1_LP-REAL-WORLD.py
+```
+</div>
+
